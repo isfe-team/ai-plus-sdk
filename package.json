@@ -27,13 +27,16 @@
   },
   "homepage": "https://github.com/isfe-team/ai-plus-sdk#readme",
   "dependencies": {
-    "@isfe/mse-player": "^0.2.1"
+    "@isfe/mse-player": "^0.2.1",
+    "@types/js-base64": "^2.3.1",
+    "js-base64": "^2.5.1"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^2.9.0",
     "@typescript-eslint/parser": "^2.9.0",
     "eslint": "^6.7.1",
     "rollup": "^1.27.5",
+    "rollup-plugin-node-resolve": "^5.2.0",
     "rollup-plugin-typescript": "^1.0.1",
     "rollup-plugin-uglify": "^6.0.3",
     "typescript": "^3.7.2"

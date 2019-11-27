@@ -1,5 +1,6 @@
 import rollupTypescript from 'rollup-plugin-typescript'
 import { uglify as rollupUglify } from 'rollup-plugin-uglify'
+// import nodeResolve from 'rollup-plugin-node-resolve'
 
 const inputs = [
   ['src/tts/index.ts', 'TTS']
