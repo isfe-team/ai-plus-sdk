@@ -1,6 +1,7 @@
 import rollupTypescript from 'rollup-plugin-typescript'
 import { uglify as rollupUglify } from 'rollup-plugin-uglify'
-// import nodeResolve from 'rollup-plugin-node-resolve'
+import nodeResolve from 'rollup-plugin-node-resolve'
+import commonjs from 'rollup-plugin-commonjs'
 
 const inputs = [
   ['src/tts/index.ts', 'TTS']
@@ -15,12 +16,17 @@ function genConfigs () {
   return inputs.reduce((acc, [input, name]) => [...acc, ...formats.reduce((acc, format) => {
     const config = {
       input,
-      plugins: [rollupTypescript()],
+      plugins: [nodeResolve(), commonjs(), rollupTypescript()],
       output: {
         name,
         format,
         sourcemap: true,
         file: `dist/${name.toLowerCase()}/${name}-${format}.js`
+      },
+      onwarn (warning, warn) {
+        if (warning.loc.file.indexOf('node_modules') === -1 && warning.code === 'EVAL') {
+          return
+        }
       }
     }
 
