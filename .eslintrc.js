@@ -1,9 +1,19 @@
 module.exports = {
-  parser:  '@typescript-eslint/parser', //定义ESLint的解析器
-  extends: ['plugin:@typescript-eslint/recommended'], //定义文件继承的子规范
-  plugins: ['@typescript-eslint'], //定义了该eslint文件所依赖的插件
-  env:{
-    browser: true,
-    node: true,
-  }                               
+  parser: '@typescript-eslint/parser',
+  plugins: [
+    '@typescript-eslint'
+  ],
+  extends: ['plugin:@typescript-eslint/recommended'],
+  rules: {
+    'eqeqeq': [
+      'error',
+      'always',
+      {
+        null: 'ignore'
+      }
+    ],
+    '@typescript-eslint/class-name-casing': 'error',
+    '@typescript-eslint/explicit-function-return-type': 'off',
+    '@typescript-eslint/no-use-before-define': 'off'
+  }
 }
