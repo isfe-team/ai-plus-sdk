@@ -1,4 +1,4 @@
-import httpNet from '../shares/apis/httpNet'
+import httpNet from '../shared/net/httpNet'
 import { Base64 }  from 'js-base64'
 
 const ttsStatus = {
@@ -30,7 +30,7 @@ function id<T> (x: T) {
 export default class Tts {
   text: string
   url: string
-  serverParams: Object
+  serverParams: any
   extendParams: Object
   status: string
   sessionId: string
@@ -78,7 +78,7 @@ export default class Tts {
     return msg
   }
 
-  detailData (callback: Function = id) {
+  getResultData (callback: Function = id) {
     this.detailData = callback
   }
 
@@ -103,7 +103,6 @@ export default class Tts {
       return
     }
     this.syncid ++
-    console.log('x', (Base64))
     const transData = JSON.parse(Base64.atob(data))
     if (!transData.result || transData.result.ret !== 0) {
       this.onError('数据有误')

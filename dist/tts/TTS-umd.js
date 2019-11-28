@@ -36,6 +36,7 @@
           }
       };
   }
+  //# sourceMappingURL=httpNet.js.map
 
   var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
 
@@ -329,7 +330,7 @@
           msg.params = Object.assign({}, msg.params, data);
           return msg;
       };
-      Tts.prototype.detailData = function (callback) {
+      Tts.prototype.getResultData = function (callback) {
           if (callback === void 0) { callback = id; }
           this.detailData = callback;
       };
@@ -352,7 +353,6 @@
               return;
           }
           this.syncid++;
-          console.log('x', (base64_1));
           var transData = JSON.parse(base64_1.atob(data));
           if (!transData.result || transData.result.ret !== 0) {
               this.onError('数据有误');
@@ -404,6 +404,7 @@
       };
       return Tts;
   }());
+  //# sourceMappingURL=index.js.map
 
   return Tts;
 

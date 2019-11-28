@@ -48,13 +48,12 @@
         }
         return new Blob([u8arr], { type: 'wav' })
       }
-      tts.detailData(function (data) {
+      tts.getResultData(function (data) {
         if (data) {
           Promise.all([data].map((blob) => {
             return pcmToWav(base64ToBlob(blob, false))
           })).then((base64Array) => {
             const blobs = base64Array.map((x) => base64ToBlob(x))
-            console.log(blobs, '000')
             player.appendFiles(blobs, wavToMp3).then(() => $audio.play())
           })
         }
