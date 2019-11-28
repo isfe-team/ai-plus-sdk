@@ -12,11 +12,20 @@
       import MSEPlayer from '../node_modules/@isfe/mse-player/dist/MSEPlayer-esm.js'
       import wavToMp3 from './wavToMp3.js'
       import pcmToWav from '../node_modules/@isfe/mse-player/dist/pcmToWav-esm.js'
-      import index from '../dist/tts/TTS-esm.js'
+      import TTS from '../dist/tts/TTS-esm.js'
       const $audio = document.querySelector('audio')
-      let tts = new index
+      const tts = new TTS(function (data) {
+        if (data) {
+          Promise.all([data].map((blob) => {
+            return pcmToWav(base64ToBlob(blob, false))
+          })).then((base64Array) => {
+            const blobs = base64Array.map((x) => base64ToBlob(x))
+            player.appendFiles(blobs, wavToMp3).then(() => $audio.play())
+          })
+        }
+      })
       let player = null
-      const data = {
+      const ttsOption = {
         appid: "test1234",
         aue: "raw",
         auf: "4",
@@ -35,7 +44,11 @@
       $button.addEventListener('click', function () {
         player =  new MSEPlayer({ onError: console.log })
         $audio.src = URL.createObjectURL(player.mediaSource)
-        tts.initTts('http://172.31.3.142:8887/tts_online/', data, $input.value)
+        tts.start({
+          url: 'http://172.31.3.142:8887/tts_online/',
+          text: $input.value,
+          ttsOption
+        })
       })
       function base64ToBlob (baseStr, isBase64 = true) {
         const data = isBase64 ? baseStr.split(',')[1] : baseStr
@@ -48,16 +61,6 @@
         }
         return new Blob([u8arr], { type: 'wav' })
       }
-      tts.getResultData(function (data) {
-        if (data) {
-          Promise.all([data].map((blob) => {
-            return pcmToWav(base64ToBlob(blob, false))
-          })).then((base64Array) => {
-            const blobs = base64Array.map((x) => base64ToBlob(x))
-            player.appendFiles(blobs, wavToMp3).then(() => $audio.play())
-          })
-        }
-      })
     </script>
   </body>
 </html>

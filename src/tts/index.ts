@@ -1,152 +1,225 @@
-import httpNet from '../shared/net/httpNet'
+/*!
+ * ai_plus_sdk | bqliu hxli
+ *
+ * @todo
+ *  - [ ] Error 处理
+ *  - [ ] 类型提取至类型模块
+ *  - [ ] net/http 类型优化
+ *  - [ ] rpcParam 入参构造优化
+ */
 import { Base64 }  from 'js-base64'
+import http, { TTS_RPCResponse, RPCResponse, SSB_RPCResponse, GRS_RPCResponse } from '../shared/net/http'
 
-const ttsStatus = {
-  'idle': 'idle', //空闲
-  'sessionBegin': 'ssb', //session begin 会话开始
-  'textWrite': 'txtw', //text put 写入文本
-  'getResult': 'grs', //get result 获取结果
-  'sessionEnd': 'sse' //session end 会话结束
+enum TTSStatus {
+  idle = 'idle',        // 空闲
+  sessionBegin = 'ssb', // 会话开始
+  textWrite = 'txtw',   // 写入文本
+  getResult = 'grs',    // 获取结果
+  sessionEnd = 'sse'    // 会话结束
 }
 
-// 公共参数
-const commonParam = {
-  id: 1,
-  jsonrpc: '2.0',
+interface IRPCMessage<T> {
+  id: number;
+  jsonrpc: string;
+  method: string;
+  params: T
+}
+
+// extends SSB_RPCParam | TXTW_RPCParam | GRS_RPCParam | SSE_RPCParam
+interface RPCMessage<T> extends IRPCMessage<T> {
+  id: 1;
+  jsonrpc: '2.0';
   method: 'deal_request',
-  params: {
-    svc: 'tts',
+  params: T
+}
+
+interface BaseRPCParam {
+  appid: string;
+  cmd: TTSStatus;
+  extend_params: string;
+  sid: string;
+  svc: string;
+  syncid: string;
+}
+
+type SSB_RPCParam = BaseRPCParam & SSB_RPCParam_SP
+
+interface SSB_RPCParam_SP {
+  aue: string;
+  auf: string;
+  auth_id: string;
+  bgs: number;
+  engine_name: string;
+  pit: number;
+  ram: number;
+  spd: number;
+  vid: string,
+  vol: number;
+}
+
+type TXTW_RPCParam = BaseRPCParam & {
+  data: string;
+}
+
+type GRS_RPCParam = BaseRPCParam
+
+type SSE_RPCParam = BaseRPCParam & {
+  auth_id: string;
+}
+
+type TTS_RPCParam = SSB_RPCParam | TXTW_RPCParam | GRS_RPCParam | SSE_RPCParam
+
+type TTSOption = SSB_RPCParam_SP & Pick<BaseRPCParam, 'extend_params'> & Pick<BaseRPCParam, 'appid'>
+
+interface StartOption {
+  url: string;
+  text: string;
+  apiMethod?: string;
+  ttsOption: TTSOption;
+}
+
+interface TTSPayload {
+  sid?: string;
+  svc: string;
+  syncid: string;
+}
+
+function genRPCMessage<T extends TTS_RPCParam> (rpcParam: T): RPCMessage<T> {
+  return {
+    id: 1,
+    jsonrpc: '2.0',
+    method: 'deal_request',
+    params: rpcParam
   }
 }
 
-function cloneDeep (data) {
-  return JSON.parse(JSON.stringify(data))
-}
+export default class TTS {
+  public status: TTSStatus = TTSStatus.idle;
+  processPCMBase64Data: Function
 
-function id<T> (x: T) {
-  return x
-}
-
-export default class Tts {
-  text: string
-  url: string
-  serverParams: any
-  extendParams: Object
-  status: string
-  sessionId: string
-  syncid: number
-  appid: string
-  detailData: Function
-  constructor () {
-    this.syncid = 0
-    this.status = null
-    this.extendParams = null
-    this.text = null
-    this.serverParams = null
-    this.sessionId = null
+  constructor (fn: Function) {
+    this.processPCMBase64Data = fn
   }
 
-  // 初始化tts, 进行sessionBegin操作
-  initTts (url: string = '', params: any, text: string = '') {
-    this.text = text
-    this.serverParams = params
-    this.extendParams = params.extend_params
-    this.url = url
-    this.start()
-  }
-  
-  start () {
-    this.syncid = 0
-    this.status = ttsStatus.sessionBegin
-    let data = cloneDeep(commonParam)
-    data.params = Object.assign({ }, data.params, this.serverParams)
-    data.params.cmd = this.status
-    data.params.syncid = this.syncid.toString()
-    this.syncid ++
-    this.getData(data)
-  }
-
-  // 获取tts各个阶段请求的参数
-  transApiData (data: any = { }) {
-    const msg = cloneDeep(commonParam)
-    data.sid = this.sessionId
-    data.appid = this.appid
-    data.cmd = this.status
-    data.syncid = this.syncid.toString()
-    data.extend_params = this.extendParams
-    msg.params = Object.assign({ }, msg.params, data)
-    return msg
-  }
-
-  getResultData (callback: Function = id) {
-    this.detailData = callback
-  }
-
-
-  end () {
-    if (!this.status || this.status === ttsStatus.sessionEnd || this.status === ttsStatus.idle) {
+  start (startOption: StartOption) {
+    if (this.status !== TTSStatus.idle) {
       return
     }
-    const data = { auth_id: this.serverParams.auth_id }
-    this.status = ttsStatus.sessionEnd
-    const sseData = this.transApiData(data)
-    this.getData(sseData)
+    const initialSyncId = -1
+    this.status = TTSStatus.sessionBegin
+
+    const rpcParam = startOption.ttsOption as SSB_RPCParam
+    rpcParam.cmd = this.status
+    
+    const ttsPayload = {
+      svc: 'tts',
+      syncid: initialSyncId.toString()
+    }
+
+    rpcParam.svc = ttsPayload.svc
+
+    this.getData(rpcParam, startOption, ttsPayload)
+  }
+
+  end (startOption: StartOption, ttsPayload: TTSPayload) {
+    if   (this.status === TTSStatus.sessionEnd || this.status === TTSStatus.idle) {
+      return
+    }
+    this.status = TTSStatus.sessionEnd
+    const { appid, extend_params } = startOption.ttsOption
+    const rpcParam: SSE_RPCParam = {
+      auth_id: startOption.ttsOption.auth_id,
+      appid,
+      extend_params,
+      cmd: this.status,
+      sid: ttsPayload.sid as string,
+      syncid: ttsPayload.syncid,
+      svc: ttsPayload.svc
+    }
+    this.getData(rpcParam, startOption, ttsPayload).catch(() => {
+      this.status === TTSStatus.idle
+    })
   }
 
   onError (error: string = '') {
     console.log(error)
   }
 
-  processResponse (data) {
-    if (!data) {
+  processResponse (rpcResponse: TTS_RPCResponse | void, startOption: StartOption, ttsPayload: TTSPayload) {
+    if (!rpcResponse) {
       this.onError()
       return
     }
-    this.syncid ++
-    const transData = JSON.parse(Base64.atob(data))
-    if (!transData.result || transData.result.ret !== 0) {
+    if (rpcResponse.ret !== 0) {
       this.onError('数据有误')
       return
     }
-    if (this.status === ttsStatus.sessionBegin) {
-      this.sessionId = transData.result.sid
-      this.status = ttsStatus.textWrite
-      const data = { data: Base64.encode(this.text) }
-      const txtwData = this.transApiData(data)
-      this.getData(txtwData)
-      return
-    }
-    if (this.status === ttsStatus.textWrite) {
-      this.status = ttsStatus.getResult
-      const grsData = this.transApiData()
-      this.getData(grsData)
-      return
-    }
-    if (this.status === ttsStatus.getResult) {
-      if (transData.result.data) {
-        this.detailData(transData.result.data)
+    if (this.status === TTSStatus.sessionBegin) {
+      ttsPayload.sid = (rpcResponse as SSB_RPCResponse).sid
+      this.status = TTSStatus.textWrite
+      const { appid, extend_params } = startOption.ttsOption
+      const rpcParam: TXTW_RPCParam = {
+        appid,
+        extend_params,
+        cmd: this.status,
+        sid: ttsPayload.sid,
+        syncid: ttsPayload.syncid,
+        svc: ttsPayload.svc,
+        data: Base64.encode(startOption.text)
       }
-      if (transData.result.ttsStatus !== 0) {
-        const grsData = this.transApiData()
-        this.getData(grsData)
-      } else {
-        this.end()
-      }
+      this.getData(rpcParam, startOption, ttsPayload)
       return
     }
-    if (this.status === ttsStatus.sessionEnd) {
-      this.status = ttsStatus.idle
+    if (this.status === TTSStatus.textWrite) {
+      this.status = TTSStatus.getResult
+      const { appid, extend_params } = startOption.ttsOption
+      const rpcParam: GRS_RPCParam = {
+        appid,
+        extend_params,
+        cmd: this.status,
+        sid: ttsPayload.sid as string,
+        syncid: ttsPayload.syncid,
+        svc: ttsPayload.svc
+      }
+      this.getData(rpcParam, startOption, ttsPayload)
+      return
+    }
+    if (this.status === TTSStatus.getResult) {
+      const response = rpcResponse as GRS_RPCResponse
+      if (response.data) {
+        this.processPCMBase64Data(response.data)
+      }
+      if (response.ttsStatus === 0) {
+        this.end(startOption, ttsPayload)
+        return
+      }
+      const { appid, extend_params } = startOption.ttsOption
+      const rpcParam: GRS_RPCParam = {
+        appid,
+        extend_params,
+        cmd: this.status,
+        sid: ttsPayload.sid as string,
+        syncid: ttsPayload.syncid,
+        svc: ttsPayload.svc
+      }
+      this.getData(rpcParam, startOption, ttsPayload)
+    }
+    if (this.status === TTSStatus.sessionEnd) {
+      this.status = TTSStatus.idle
     }
   }
 
-  getData (data: Object = { }, method: string = 'post') {
-    httpNet(method, this.url, JSON.stringify(data), (err, data) => {
-      if (!err) {
-        this.processResponse(data)
-      } else {
-        this.onError(err)
-      }
+  getData (rpcParam: TTS_RPCParam, option: StartOption, ttsPayload: TTSPayload) {
+    ttsPayload.syncid = (+ttsPayload.syncid + 1).toString()
+    const rpcMessage = genRPCMessage(rpcParam)
+
+    return http<RPCResponse<TTS_RPCResponse>>(option.url, option.apiMethod, JSON.stringify(rpcMessage)).then((data) => {
+      this.processResponse(data.result, option, ttsPayload)
+      console.log(data.result)
+      return data.result
+    }).catch((err) => {
+      this.onError(err)
+      throw err
     })
   }
 }
-

@@ -1,37 +1,3 @@
-function api(method, url, param, callback) {
-    if (method === void 0) { method = 'POST'; }
-    method = method.toUpperCase();
-    var xmlHttp = new XMLHttpRequest();
-    xmlHttp.open(method, url, true);
-    xmlHttp.timeout = 5 * 1000;
-    xmlHttp.setRequestHeader('Content-Type', 'application/json-rpc');
-    xmlHttp.send(param);
-    xmlHttp.onreadystatechange = function () {
-        var ret = null;
-        try {
-            ret = xmlHttp.responseText;
-        }
-        catch (e) { }
-        if (xmlHttp.readyState === 4) {
-            if (xmlHttp.status >= 200 && xmlHttp.status < 300) {
-                callback(null, ret);
-            }
-            else {
-                if (xmlHttp.status === 500) {
-                    callback(new Error('系统异常'), ret);
-                    return;
-                }
-                if (xmlHttp.status === 504) {
-                    callback(new Error('网络超时'), ret);
-                    return;
-                }
-                callback(new Error('请求失败'), ret);
-            }
-        }
-    };
-}
-//# sourceMappingURL=httpNet.js.map
-
 var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
 
 function createCommonjsModule(fn, module) {
@@ -261,144 +227,191 @@ var base64 = createCommonjsModule(function (module, exports) {
 });
 var base64_1 = base64.Base64;
 
-var ttsStatus = {
-    'idle': 'idle',
-    'sessionBegin': 'ssb',
-    'textWrite': 'txtw',
-    'getResult': 'grs',
-    'sessionEnd': 'sse' //session end 会话结束
-};
-// 公共参数
-var commonParam = {
-    id: 1,
-    jsonrpc: '2.0',
-    method: 'deal_request',
-    params: {
-        svc: 'tts',
-    }
-};
-function cloneDeep(data) {
-    return JSON.parse(JSON.stringify(data));
+function http(url, method, param) {
+    if (method === void 0) { method = 'POST'; }
+    return new Promise(function (resolve, reject) {
+        method = method.toUpperCase();
+        var xmlHttp = new XMLHttpRequest();
+        xmlHttp.open(method, url, true);
+        xmlHttp.timeout = 5 * 1000;
+        xmlHttp.setRequestHeader('Content-Type', 'application/json-rpc');
+        xmlHttp.send(param);
+        xmlHttp.onreadystatechange = function () {
+            if (xmlHttp.readyState === 4) {
+                if (xmlHttp.status >= 200 && xmlHttp.status < 300) {
+                    var ret = null;
+                    try {
+                        ret = JSON.parse(base64_1.atob(xmlHttp.responseText));
+                    }
+                    catch (e) {
+                        reject(e);
+                        return;
+                    }
+                    resolve(ret);
+                    return;
+                }
+                if (xmlHttp.status === 500) {
+                    reject(new Error('系统异常'));
+                    return;
+                }
+                if (xmlHttp.status === 504) {
+                    reject(new Error('网络超时'));
+                    return;
+                }
+                reject(new Error('请求失败'));
+            }
+        };
+    });
 }
-function id(x) {
-    return x;
+//# sourceMappingURL=http.js.map
+
+/*!
+ * ai_plus_sdk | bqliu hxli
+ *
+ * @todo
+ *  - [ ] Error 处理
+ *  - [ ] 类型提取至类型模块
+ *  - [ ] net/http 类型优化
+ *  - [ ] rpcParam 入参构造优化
+ */
+var TTSStatus;
+(function (TTSStatus) {
+    TTSStatus["idle"] = "idle";
+    TTSStatus["sessionBegin"] = "ssb";
+    TTSStatus["textWrite"] = "txtw";
+    TTSStatus["getResult"] = "grs";
+    TTSStatus["sessionEnd"] = "sse"; // 会话结束
+})(TTSStatus || (TTSStatus = {}));
+function genRPCMessage(rpcParam) {
+    return {
+        id: 1,
+        jsonrpc: '2.0',
+        method: 'deal_request',
+        params: rpcParam
+    };
 }
-var Tts = /** @class */ (function () {
-    function Tts() {
-        this.syncid = 0;
-        this.status = null;
-        this.extendParams = null;
-        this.text = null;
-        this.serverParams = null;
-        this.sessionId = null;
+var TTS = /** @class */ (function () {
+    function TTS(fn) {
+        this.status = TTSStatus.idle;
+        this.processPCMBase64Data = fn;
     }
-    // 初始化tts, 进行sessionBegin操作
-    Tts.prototype.initTts = function (url, params, text) {
-        if (url === void 0) { url = ''; }
-        if (text === void 0) { text = ''; }
-        this.text = text;
-        this.serverParams = params;
-        this.extendParams = params.extend_params;
-        this.url = url;
-        this.start();
-    };
-    Tts.prototype.start = function () {
-        this.syncid = 0;
-        this.status = ttsStatus.sessionBegin;
-        var data = cloneDeep(commonParam);
-        data.params = Object.assign({}, data.params, this.serverParams);
-        data.params.cmd = this.status;
-        data.params.syncid = this.syncid.toString();
-        this.syncid++;
-        this.getData(data);
-    };
-    // 获取tts各个阶段请求的参数
-    Tts.prototype.transApiData = function (data) {
-        if (data === void 0) { data = {}; }
-        var msg = cloneDeep(commonParam);
-        data.sid = this.sessionId;
-        data.appid = this.appid;
-        data.cmd = this.status;
-        data.syncid = this.syncid.toString();
-        data.extend_params = this.extendParams;
-        msg.params = Object.assign({}, msg.params, data);
-        return msg;
-    };
-    Tts.prototype.getResultData = function (callback) {
-        if (callback === void 0) { callback = id; }
-        this.detailData = callback;
-    };
-    Tts.prototype.end = function () {
-        if (!this.status || this.status === ttsStatus.sessionEnd || this.status === ttsStatus.idle) {
+    TTS.prototype.start = function (startOption) {
+        if (this.status !== TTSStatus.idle) {
             return;
         }
-        var data = { auth_id: this.serverParams.auth_id };
-        this.status = ttsStatus.sessionEnd;
-        var sseData = this.transApiData(data);
-        this.getData(sseData);
+        var initialSyncId = -1;
+        this.status = TTSStatus.sessionBegin;
+        var rpcParam = startOption.ttsOption;
+        rpcParam.cmd = this.status;
+        var ttsPayload = {
+            svc: 'tts',
+            syncid: initialSyncId.toString()
+        };
+        rpcParam.svc = ttsPayload.svc;
+        this.getData(rpcParam, startOption, ttsPayload);
     };
-    Tts.prototype.onError = function (error) {
+    TTS.prototype.end = function (startOption, ttsPayload) {
+        var _this = this;
+        if (this.status === TTSStatus.sessionEnd || this.status === TTSStatus.idle) {
+            return;
+        }
+        this.status = TTSStatus.sessionEnd;
+        var _a = startOption.ttsOption, appid = _a.appid, extend_params = _a.extend_params;
+        var rpcParam = {
+            auth_id: startOption.ttsOption.auth_id,
+            appid: appid,
+            extend_params: extend_params,
+            cmd: this.status,
+            sid: ttsPayload.sid,
+            syncid: ttsPayload.syncid,
+            svc: ttsPayload.svc
+        };
+        this.getData(rpcParam, startOption, ttsPayload).catch(function () {
+            _this.status === TTSStatus.idle;
+        });
+    };
+    TTS.prototype.onError = function (error) {
         if (error === void 0) { error = ''; }
         console.log(error);
     };
-    Tts.prototype.processResponse = function (data) {
-        if (!data) {
+    TTS.prototype.processResponse = function (rpcResponse, startOption, ttsPayload) {
+        if (!rpcResponse) {
             this.onError();
             return;
         }
-        this.syncid++;
-        var transData = JSON.parse(base64_1.atob(data));
-        if (!transData.result || transData.result.ret !== 0) {
+        if (rpcResponse.ret !== 0) {
             this.onError('数据有误');
             return;
         }
-        if (this.status === ttsStatus.sessionBegin) {
-            this.sessionId = transData.result.sid;
-            this.status = ttsStatus.textWrite;
-            var data_1 = { data: base64_1.encode(this.text) };
-            var txtwData = this.transApiData(data_1);
-            this.getData(txtwData);
+        if (this.status === TTSStatus.sessionBegin) {
+            ttsPayload.sid = rpcResponse.sid;
+            this.status = TTSStatus.textWrite;
+            var _a = startOption.ttsOption, appid = _a.appid, extend_params = _a.extend_params;
+            var rpcParam = {
+                appid: appid,
+                extend_params: extend_params,
+                cmd: this.status,
+                sid: ttsPayload.sid,
+                syncid: ttsPayload.syncid,
+                svc: ttsPayload.svc,
+                data: base64_1.encode(startOption.text)
+            };
+            this.getData(rpcParam, startOption, ttsPayload);
             return;
         }
-        if (this.status === ttsStatus.textWrite) {
-            this.status = ttsStatus.getResult;
-            var grsData = this.transApiData();
-            this.getData(grsData);
+        if (this.status === TTSStatus.textWrite) {
+            this.status = TTSStatus.getResult;
+            var _b = startOption.ttsOption, appid = _b.appid, extend_params = _b.extend_params;
+            var rpcParam = {
+                appid: appid,
+                extend_params: extend_params,
+                cmd: this.status,
+                sid: ttsPayload.sid,
+                syncid: ttsPayload.syncid,
+                svc: ttsPayload.svc
+            };
+            this.getData(rpcParam, startOption, ttsPayload);
             return;
         }
-        if (this.status === ttsStatus.getResult) {
-            if (transData.result.data) {
-                this.detailData(transData.result.data);
+        if (this.status === TTSStatus.getResult) {
+            var response = rpcResponse;
+            if (response.data) {
+                this.processPCMBase64Data(response.data);
             }
-            if (transData.result.ttsStatus !== 0) {
-                var grsData = this.transApiData();
-                this.getData(grsData);
+            if (response.ttsStatus === 0) {
+                this.end(startOption, ttsPayload);
+                return;
             }
-            else {
-                this.end();
-            }
-            return;
+            var _c = startOption.ttsOption, appid = _c.appid, extend_params = _c.extend_params;
+            var rpcParam = {
+                appid: appid,
+                extend_params: extend_params,
+                cmd: this.status,
+                sid: ttsPayload.sid,
+                syncid: ttsPayload.syncid,
+                svc: ttsPayload.svc
+            };
+            this.getData(rpcParam, startOption, ttsPayload);
         }
-        if (this.status === ttsStatus.sessionEnd) {
-            this.status = ttsStatus.idle;
+        if (this.status === TTSStatus.sessionEnd) {
+            this.status = TTSStatus.idle;
         }
     };
-    Tts.prototype.getData = function (data, method) {
+    TTS.prototype.getData = function (rpcParam, option, ttsPayload) {
         var _this = this;
-        if (data === void 0) { data = {}; }
-        if (method === void 0) { method = 'post'; }
-        api(method, this.url, JSON.stringify(data), function (err, data) {
-            if (!err) {
-                _this.processResponse(data);
-            }
-            else {
-                _this.onError(err);
-            }
+        ttsPayload.syncid = (+ttsPayload.syncid + 1).toString();
+        var rpcMessage = genRPCMessage(rpcParam);
+        return http(option.url, option.apiMethod, JSON.stringify(rpcMessage)).then(function (data) {
+            _this.processResponse(data.result, option, ttsPayload);
+            console.log(data.result);
+            return data.result;
+        }).catch(function (err) {
+            _this.onError(err);
+            throw err;
         });
     };
-    return Tts;
+    return TTS;
 }());
-//# sourceMappingURL=index.js.map
 
-export default Tts;
+export default TTS;
 //# sourceMappingURL=TTS-esm.js.map
