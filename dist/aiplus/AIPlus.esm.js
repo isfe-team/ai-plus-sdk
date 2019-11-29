@@ -126,7 +126,7 @@ var TTS = /** @class */ (function () {
         this.status = TTSStatus.sessionBegin;
         var ttsPayload = {
             svc: 'tts',
-            syncid: initialSyncId
+            syncid: initialSyncId.toString()
         };
         var rpcParam = __assign(__assign({}, startOption.ttsOption), { cmd: this.status, svc: ttsPayload.svc, syncid: ttsPayload.syncid });
         // user can invoke `end`
@@ -183,7 +183,6 @@ var TTS = /** @class */ (function () {
         var basicParam = {
             appid: appid,
             extend_params: extend_params,
-            cmd: this.status,
             sid: ttsPayload.sid || '',
             syncid: ttsPayload.syncid,
             svc: ttsPayload.svc
@@ -191,12 +190,12 @@ var TTS = /** @class */ (function () {
         if (this.status === TTSStatus.sessionBegin) {
             ttsPayload.sid = rpcResponse.sid;
             this.status = TTSStatus.textWrite;
-            var rpcParam = __assign(__assign({}, basicParam), { data: Base64.encode(startOption.text) });
+            var rpcParam = __assign(__assign({}, basicParam), { cmd: this.status, data: Base64.encode(startOption.text) });
             return this.interact(rpcParam, startOption, ttsPayload);
         }
         if (this.status === TTSStatus.textWrite) {
             this.status = TTSStatus.getResult;
-            var rpcParam = basicParam;
+            var rpcParam = __assign(__assign({}, basicParam), { cmd: this.status });
             return this.interact(rpcParam, startOption, ttsPayload);
         }
         if (this.status === TTSStatus.getResult) {
@@ -208,7 +207,7 @@ var TTS = /** @class */ (function () {
                 // or `this.end()`
                 return this._end(startOption, ttsPayload);
             }
-            var rpcParam = basicParam;
+            var rpcParam = __assign(__assign({}, basicParam), { cmd: this.status });
             return this.interact(rpcParam, startOption, ttsPayload);
         }
         if (this.status === TTSStatus.sessionEnd) {
