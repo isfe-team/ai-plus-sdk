@@ -14,6 +14,7 @@ import { SSB_RPCParam_SP, TTS_RPCParam, RPCMessage, TTSStatus, SSE_RPCParam, TXT
 import { genError, Error } from '../shared/helpers/error';
 
 export * from './types'
+export * from '../shared/helpers/error'
 
 export type TTSOption = SSB_RPCParam_SP & Pick<BaseRPCParam, 'extend_params'> & Pick<BaseRPCParam, 'appid'>
 
