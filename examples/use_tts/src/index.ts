@@ -29,7 +29,7 @@ const ttsOption = {
   auth_id: '1234567890',
   bgs: 0,
   engine_name: 'tts_online',
-  extend_params: `{'params': 'token=appid123,ability=ab_tts'}}`,
+  extend_params: '{"params":"token=appid123,ability=ab_tts,vol=0,spd=0,pit=0,effect=0,bgs=0"}',
   pit: 0,
   ram: 0,
   spd: 0,
@@ -43,7 +43,8 @@ $button.addEventListener('click', function () {
   player = new MSEPlayer({ onError: console.log })
   $audio.src = URL.createObjectURL(player.mediaSource)
   tts.start({
-    url: 'http://172.31.3.142:8887/tts_online/',
+    url: 'http://172.31.3.142:8087/tts/',
+    // url: 'http://172.31.3.142:8087/tts_online/',
     text: $input.value,
     ttsOption
   })

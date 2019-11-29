@@ -122,7 +122,7 @@ var TTS = /** @class */ (function () {
         if (this.status !== TTSStatus.idle) {
             return;
         }
-        var initialSyncId = '-1';
+        var initialSyncId = '0';
         this.status = TTSStatus.sessionBegin;
         var ttsPayload = {
             svc: 'tts',

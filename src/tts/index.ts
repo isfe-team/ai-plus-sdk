@@ -57,12 +57,12 @@ export default class TTS {
     if (this.status !== TTSStatus.idle) {
       return
     }
-    const initialSyncId = '-1'
+    const initialSyncId = '0'
     this.status = TTSStatus.sessionBegin
 
     const ttsPayload = {
       svc: 'tts',
-      syncid: initialSyncId
+      syncid: initialSyncId.toString()
     }
 
     const rpcParam: SSB_RPCParam = {
@@ -133,9 +133,7 @@ export default class TTS {
     const { appid, extend_params } = startOption.ttsOption
     const basicParam = {
       appid,
-
       extend_params,
-      cmd: this.status,
       sid: ttsPayload.sid || '',
       syncid: ttsPayload.syncid,
       svc: ttsPayload.svc
@@ -145,13 +143,17 @@ export default class TTS {
       this.status = TTSStatus.textWrite
       const rpcParam: TXTW_RPCParam = {
         ...basicParam,
+        cmd: this.status,
         data: Base64.encode(startOption.text)
       }
       return this.interact(rpcParam, startOption, ttsPayload)
     }
     if (this.status === TTSStatus.textWrite) {
       this.status = TTSStatus.getResult
-      const rpcParam: GRS_RPCParam = basicParam
+      const rpcParam: GRS_RPCParam = {
+        ...basicParam,
+        cmd: this.status
+      }
       return this.interact(rpcParam, startOption, ttsPayload)
     }
     if (this.status === TTSStatus.getResult) {
@@ -163,7 +165,10 @@ export default class TTS {
         // or `this.end()`
         return this._end(startOption, ttsPayload)
       }
-      const rpcParam: GRS_RPCParam = basicParam
+      const rpcParam: GRS_RPCParam = {
+        ...basicParam,
+        cmd: this.status
+      }
       return this.interact(rpcParam, startOption, ttsPayload)
     }
     if (this.status === TTSStatus.sessionEnd) {

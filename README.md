@@ -5,7 +5,7 @@ ai+ sdk, including tts/iat, by @bqliu @hxli.
 ## Usages
 
 ```bash
-$ npm i -S @isfe/ai-plus-sdk js-base64 lamejs
+$ npm i -S @isfe/ai-plus-sdk @isfe/mse-player js-base64 lamejs
 ```
 
 ## Refs

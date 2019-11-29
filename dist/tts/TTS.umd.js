@@ -123,7 +123,7 @@
             if (this.status !== exports.TTSStatus.idle) {
                 return;
             }
-            var initialSyncId = '-1';
+            var initialSyncId = '0';
             this.status = exports.TTSStatus.sessionBegin;
             var ttsPayload = {
                 svc: 'tts',

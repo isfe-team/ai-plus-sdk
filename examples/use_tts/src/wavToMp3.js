@@ -4,6 +4,8 @@
  *  - [ ] to `ts`
  */
 
+// import lamejs from 'lamejs'
+
 export default function wavToMp3 (buffers) {
   return Promise.all(buffers.map((buf) => new Promise((resolve, reject) => {
     const wav = lamejs.WavHeader.readHeader(new DataView(buf))

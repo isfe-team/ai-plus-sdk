@@ -19,8 +19,8 @@ function genConfigs () {
       output: {
         name,
         format,
-        sourcemap: false,
-        file: `./${name}-${format}.js`
+        sourcemap: true,
+        file: `./${name}.${format}.js`
       },
       onwarn (warning) {
         if (warning.loc && warning.loc.file.indexOf('node_modules') === -1 && warning.code === 'EVAL') {
