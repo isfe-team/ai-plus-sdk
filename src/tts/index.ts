@@ -11,33 +11,11 @@
 import { Base64 }  from 'js-base64'
 import http from '../shared/net/http'
 import { SSB_RPCParam_SP, TTS_RPCParam, RPCMessage, TTSStatus, SSE_RPCParam, TXTW_RPCParam, GRS_RPCParam, BaseRPCParam, TTS_RPCResponse, SSB_RPCResponse, GRS_RPCResponse, RPCResponse, SSB_RPCParam } from './types';
+import { genError, Error } from '../shared/helpers/error';
 
 export * from './types'
 
 export type TTSOption = SSB_RPCParam_SP & Pick<BaseRPCParam, 'extend_params'> & Pick<BaseRPCParam, 'appid'>
-
-export enum Error {
-  RESPONSE_ERROR,
-  NO_RESPONSE
-}
-
-export interface AISdkError<T = any> {
-  AISdkError: true;
-  type: Error;
-  error?: T;
-}
-
-export function genError <T = any> (type: Error, error?: T): AISdkError<T> {
-  return {
-    AISdkError: true,
-    type,
-    error
-  }
-}
-
-export function isAISdkError (error: any): error is AISdkError {
-  return error.AISdkError === true
-}
 
 export interface StartOption {
   url: string;
