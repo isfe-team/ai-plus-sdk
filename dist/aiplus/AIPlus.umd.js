@@ -191,7 +191,7 @@
           if (this.status === exports.TTSStatus.sessionBegin) {
               ttsPayload.sid = rpcResponse.sid;
               this.status = exports.TTSStatus.textWrite;
-              var rpcParam = __assign(__assign({}, basicParam), { cmd: this.status, data: jsBase64.Base64.encode(startOption.text) });
+              var rpcParam = __assign(__assign({}, basicParam), { cmd: this.status, sid: ttsPayload.sid, data: jsBase64.Base64.encode(startOption.text) });
               return this.interact(rpcParam, startOption, ttsPayload);
           }
           if (this.status === exports.TTSStatus.textWrite) {

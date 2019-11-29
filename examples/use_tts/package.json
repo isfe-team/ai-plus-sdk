@@ -27,7 +27,7 @@
   },
   "homepage": "https://github.com/isfe-team/ai-plus-sdk#readme",
   "dependencies": {
-    "@isfe/ai-plus-sdk": "^0.2.0",
+    "@isfe/ai-plus-sdk": "^0.2.1",
     "@isfe/mse-player": "^0.2.2",
     "js-base64": "^2.5.1",
     "lamejs": "^1.2.0"

@@ -190,7 +190,7 @@ var TTS = /** @class */ (function () {
         if (this.status === TTSStatus.sessionBegin) {
             ttsPayload.sid = rpcResponse.sid;
             this.status = TTSStatus.textWrite;
-            var rpcParam = __assign(__assign({}, basicParam), { cmd: this.status, data: Base64.encode(startOption.text) });
+            var rpcParam = __assign(__assign({}, basicParam), { cmd: this.status, sid: ttsPayload.sid, data: Base64.encode(startOption.text) });
             return this.interact(rpcParam, startOption, ttsPayload);
         }
         if (this.status === TTSStatus.textWrite) {

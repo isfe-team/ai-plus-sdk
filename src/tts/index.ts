@@ -144,6 +144,7 @@ export default class TTS {
       const rpcParam: TXTW_RPCParam = {
         ...basicParam,
         cmd: this.status,
+        sid: ttsPayload.sid,
         data: Base64.encode(startOption.text)
       }
       return this.interact(rpcParam, startOption, ttsPayload)
