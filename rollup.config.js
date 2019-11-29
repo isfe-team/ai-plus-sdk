@@ -4,7 +4,8 @@ import nodeResolve from 'rollup-plugin-node-resolve'
 import commonjs from 'rollup-plugin-commonjs'
 
 const inputs = [
-  ['src/tts/index.ts', 'TTS']
+  ['src/tts/index.ts', 'TTS'],
+  ['src/tts/TTSWithPlayer.ts', 'TTSPlayer']
 ]
 
 const formats = [
@@ -23,8 +24,8 @@ function genConfigs () {
         sourcemap: true,
         file: `dist/${name.toLowerCase()}/${name}-${format}.js`
       },
-      onwarn (warning, warn) {
-        if (warning.loc.file.indexOf('node_modules') === -1 && warning.code === 'EVAL') {
+      onwarn (warning) {
+        if (warning.loc && warning.loc.file.indexOf('node_modules') === -1 && warning.code === 'EVAL') {
           return
         }
       }

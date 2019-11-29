@@ -69,7 +69,7 @@ type SSE_RPCParam = BaseRPCParam & {
 
 type TTS_RPCParam = SSB_RPCParam | TXTW_RPCParam | GRS_RPCParam | SSE_RPCParam
 
-type TTSOption = SSB_RPCParam_SP & Pick<BaseRPCParam, 'extend_params'> & Pick<BaseRPCParam, 'appid'>
+export type TTSOption = SSB_RPCParam_SP & Pick<BaseRPCParam, 'extend_params'> & Pick<BaseRPCParam, 'appid'>
 
 interface StartOption {
   url: string;
