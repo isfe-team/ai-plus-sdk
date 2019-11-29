@@ -1,13 +1,7 @@
 /*!
  * tts of ai plus sdk | bqliu hxli
- *
- * @todo
- *  - [ ] Error 处理
- *  - [ ] 类型提取至类型模块
- *  - [ ] net/http 类型优化
- *  - [ ] rpcParam 入参构造优化
- *  - [ ] api 设计<Promise?>
  */
+
 import { Base64 }  from 'js-base64'
 import http from '../shared/net/http'
 import { SSB_RPCParam_SP, TTS_RPCParam, RPCMessage, TTSStatus, SSE_RPCParam, TXTW_RPCParam, GRS_RPCParam, BaseRPCParam, TTS_RPCResponse, SSB_RPCResponse, GRS_RPCResponse, RPCResponse, SSB_RPCParam } from './types';
@@ -184,7 +178,11 @@ export default class TTS {
 
     const rpcMessage = genRPCMessage(rpcParam)
 
-    return http<RPCResponse<TTS_RPCResponse>>(option.url, option.apiMethod, JSON.stringify(rpcMessage)).then((data) => {
+    return http<RPCResponse<TTS_RPCResponse>>({
+      url: option.url,
+      method: option.apiMethod,
+      param: JSON.stringify(rpcMessage)
+    }).then((data) => {
       return this.processResponse(data, option, ttsPayload)
     })
   }

@@ -4,6 +4,7 @@ import nodeResolve from 'rollup-plugin-node-resolve'
 import commonjs from 'rollup-plugin-commonjs'
 
 const inputs = [
+  ['src/index.ts', 'AIPlus'],
   ['src/tts/index.ts', 'TTS']
 ]
 
@@ -17,14 +18,15 @@ function genConfigs () {
     const config = {
       input,
       plugins: [nodeResolve(), commonjs(), rollupTypescript()],
+      external: ['js-base64', 'lamejs', '@isfe/mse-player'],
       output: {
         name,
         format,
         sourcemap: true,
         file: `dist/${name.toLowerCase()}/${name}-${format}.js`
       },
-      onwarn (warning, warn) {
-        if (warning.loc.file.indexOf('node_modules') === -1 && warning.code === 'EVAL') {
+      onwarn (warning) {
+        if (warning.loc && warning.loc.file.indexOf('node_modules') === -1 && warning.code === 'EVAL') {
           return
         }
       }

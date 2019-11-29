@@ -1,8 +1,8 @@
 {
-  "name": "ai-plus-sdk",
+  "name": "@isfe/ai-plus-sdk",
   "version": "0.1.0",
-  "description": "play audio",
-  "main": "index.js",
+  "description": "ai+ sdk, including tts/iat.",
+  "main": "dist/aiplus/AIPlus-esm.js",
   "scripts": {
     "lint": "eslint src/*",
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -26,12 +26,8 @@
     "url": "https://github.com/isfe-team/ai-plus-sdk/issues"
   },
   "homepage": "https://github.com/isfe-team/ai-plus-sdk#readme",
-  "dependencies": {
-    "@isfe/mse-player": "^0.2.1",
-    "@types/js-base64": "^2.3.1",
-    "js-base64": "^2.5.1"
-  },
   "devDependencies": {
+    "@types/js-base64": "^2.3.1",
     "@typescript-eslint/eslint-plugin": "^2.9.0",
     "@typescript-eslint/parser": "^2.9.0",
     "eslint": "^6.7.1",
@@ -41,5 +37,9 @@
     "rollup-plugin-typescript": "^1.0.1",
     "rollup-plugin-uglify": "^6.0.3",
     "typescript": "^3.7.2"
+  },
+  "peerDependencies": {
+    "@isfe/mse-player": "^0.2.1",
+    "js-base64": "^2.5.1"
   }
 }

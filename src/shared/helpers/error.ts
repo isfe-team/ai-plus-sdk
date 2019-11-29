@@ -3,8 +3,8 @@
  */
 
 export enum Error {
-  RESPONSE_ERROR,
-  NO_RESPONSE
+  RESPONSE_ERROR = 'RESPONSE_ERROR',
+  NO_RESPONSE = 'NO_RESPONSE'
 }
 
 export interface AISdkError<T = any> {
