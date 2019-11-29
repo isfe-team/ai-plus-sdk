@@ -60,6 +60,7 @@ function http(_a) {
         });
     });
 }
+//# sourceMappingURL=http.js.map
 
 /*!
  * types | bqliu hxli
@@ -73,6 +74,7 @@ var TTSStatus;
     TTSStatus["getResult"] = "grs";
     TTSStatus["sessionEnd"] = "sse"; // 会话结束
 })(TTSStatus || (TTSStatus = {}));
+//# sourceMappingURL=types.js.map
 
 /*!
  * error | bqliu
@@ -92,6 +94,7 @@ function genError(type, error) {
 function isAISdkError(error) {
     return error.AISdkError === true;
 }
+//# sourceMappingURL=error.js.map
 
 /*!
  * tts of ai plus sdk | bqliu hxli
@@ -112,12 +115,10 @@ var dummyResolvedPromise = Promise.resolve();
 // ssb -> process -> txtw -> process -> grs -> process -> grs -> process -> sse
 // ssb -> process -> txtw -> process -> grs -> process -> grs -> process -> sse error -> 
 var TTS = /** @class */ (function () {
-    function TTS(status, processPCMBase64Data, onError) {
-        if (status === void 0) { status = TTSStatus.idle; }
-        this.status = status;
+    function TTS(processPCMBase64Data, onError) {
         this.processPCMBase64Data = processPCMBase64Data;
         this.onError = onError;
-        // only assignment
+        this.status = TTSStatus.idle;
     }
     TTS.prototype.start = function (startOption) {
         var _this = this;

@@ -4,13 +4,11 @@ import nodeResolve from 'rollup-plugin-node-resolve'
 import commonjs from 'rollup-plugin-commonjs'
 
 const inputs = [
-  ['src/index.ts', 'AIPlus'],
-  ['src/tts/index.ts', 'TTS']
+  ['src/index.ts', 'main']
 ]
 
 const formats = [
-  'esm',
-  'umd'
+  'esm'
 ]
 
 function genConfigs () {
@@ -18,12 +16,11 @@ function genConfigs () {
     const config = {
       input,
       plugins: [nodeResolve(), commonjs(), rollupTypescript()],
-      external: ['js-base64', 'lamejs', '@isfe/mse-player'],
       output: {
         name,
         format,
-        sourcemap: true,
-        file: `dist/${name.toLowerCase()}/${name}.${format}.js`
+        sourcemap: false,
+        file: `./${name}-${format}.js`
       },
       onwarn (warning) {
         if (warning.loc && warning.loc.file.indexOf('node_modules') === -1 && warning.code === 'EVAL') {
@@ -39,7 +36,7 @@ function genConfigs () {
       const compactConfig = {
         ...config,
         plugins: [...config.plugins, rollupUglify()],
-        output: { ...config.output, file: `dist/${name.toLowerCase()}/${name}.${format}.min.js` }
+        output: { ...config.output, file: `${name}.${format}.min.js` }
       }
       configs.push(compactConfig)
     }

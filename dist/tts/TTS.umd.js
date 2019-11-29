@@ -64,7 +64,6 @@
             });
         });
     }
-    //# sourceMappingURL=http.js.map
 
     /*!
      * types | bqliu hxli
@@ -76,7 +75,6 @@
         TTSStatus["getResult"] = "grs";
         TTSStatus["sessionEnd"] = "sse"; // 会话结束
     })(exports.TTSStatus || (exports.TTSStatus = {}));
-    //# sourceMappingURL=types.js.map
 
     /*!
      * error | bqliu
@@ -95,7 +93,6 @@
     function isAISdkError(error) {
         return error.AISdkError === true;
     }
-    //# sourceMappingURL=error.js.map
 
     /*!
      * tts of ai plus sdk | bqliu hxli
@@ -244,4 +241,4 @@
     Object.defineProperty(exports, '__esModule', { value: true });
 
 })));
-//# sourceMappingURL=TTS-umd.js.map
+//# sourceMappingURL=TTS.umd.js.map

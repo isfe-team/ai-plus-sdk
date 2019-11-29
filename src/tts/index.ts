@@ -44,12 +44,13 @@ const dummyResolvedPromise = Promise.resolve()
 // ssb -> process -> txtw -> process -> grs -> process -> grs -> process -> sse error -> 
 export default class TTS {
   end!: () => Promise<void | Promise<RPCResponse<TTS_RPCResponse>>>;
+  public status: TTSStatus;
+
   constructor (
-    public status: TTSStatus = TTSStatus.idle,
     public processPCMBase64Data: Function,
-    public onError: Function
+    public onError?: Function
   ) {
-    // only assignment
+    this.status = TTSStatus.idle
   }
 
   start (startOption: StartOption) {

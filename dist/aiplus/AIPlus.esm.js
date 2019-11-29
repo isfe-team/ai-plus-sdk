@@ -18,7 +18,6 @@ function genError(type, error) {
 function isAISdkError(error) {
     return error.AISdkError === true;
 }
-//# sourceMappingURL=error.js.map
 
 /*! *****************************************************************************
 Copyright (c) Microsoft Corporation. All rights reserved.
@@ -80,7 +79,6 @@ function http(_a) {
         });
     });
 }
-//# sourceMappingURL=http.js.map
 
 /*!
  * types | bqliu hxli
@@ -94,7 +92,6 @@ var TTSStatus;
     TTSStatus["getResult"] = "grs";
     TTSStatus["sessionEnd"] = "sse"; // 会话结束
 })(TTSStatus || (TTSStatus = {}));
-//# sourceMappingURL=types.js.map
 
 /*!
  * tts of ai plus sdk | bqliu hxli
@@ -235,8 +232,7 @@ var TTS = /** @class */ (function () {
     };
     return TTS;
 }());
-//# sourceMappingURL=index.js.map
 
 export default TTS;
 export { Error, TTSStatus, genError, isAISdkError };
-//# sourceMappingURL=AIPlus-esm.js.map
+//# sourceMappingURL=AIPlus.esm.js.map

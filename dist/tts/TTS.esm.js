@@ -1,25 +1,5 @@
 import { Base64 } from 'js-base64';
 
-/*!
- * error | bqliu
- */
-var Error;
-(function (Error) {
-    Error["RESPONSE_ERROR"] = "RESPONSE_ERROR";
-    Error["NO_RESPONSE"] = "NO_RESPONSE";
-})(Error || (Error = {}));
-function genError(type, error) {
-    return {
-        AISdkError: true,
-        type: type,
-        error: error
-    };
-}
-function isAISdkError(error) {
-    return error.AISdkError === true;
-}
-//# sourceMappingURL=error.js.map
-
 /*! *****************************************************************************
 Copyright (c) Microsoft Corporation. All rights reserved.
 Licensed under the Apache License, Version 2.0 (the "License"); you may not use
@@ -80,7 +60,6 @@ function http(_a) {
         });
     });
 }
-//# sourceMappingURL=http.js.map
 
 /*!
  * types | bqliu hxli
@@ -94,7 +73,25 @@ var TTSStatus;
     TTSStatus["getResult"] = "grs";
     TTSStatus["sessionEnd"] = "sse"; // 会话结束
 })(TTSStatus || (TTSStatus = {}));
-//# sourceMappingURL=types.js.map
+
+/*!
+ * error | bqliu
+ */
+var Error;
+(function (Error) {
+    Error["RESPONSE_ERROR"] = "RESPONSE_ERROR";
+    Error["NO_RESPONSE"] = "NO_RESPONSE";
+})(Error || (Error = {}));
+function genError(type, error) {
+    return {
+        AISdkError: true,
+        type: type,
+        error: error
+    };
+}
+function isAISdkError(error) {
+    return error.AISdkError === true;
+}
 
 /*!
  * tts of ai plus sdk | bqliu hxli
@@ -235,8 +232,7 @@ var TTS = /** @class */ (function () {
     };
     return TTS;
 }());
-//# sourceMappingURL=index.js.map
 
 export default TTS;
 export { Error, TTSStatus, genError, isAISdkError };
-//# sourceMappingURL=AIPlus-esm.js.map
+//# sourceMappingURL=TTS.esm.js.map
