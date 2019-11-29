@@ -1,37 +1,5 @@
 import { Base64 } from 'js-base64'
 
-interface IRPCResponse<T> {
-  id: number;
-  jsonrpc: string;
-  result?: T;
-}
-
-export interface RPCResponse<T extends TTS_RPCResponse> extends IRPCResponse<T> {
-  id: number;
-  jsonrpc: '2.0';
-  result?: T;
-}
-
-interface Base_RPCResponse {
-  ret: number;
-}
-
-export type SSB_RPCResponse = Base_RPCResponse & {
-  sid: string;
-}
-
-type TXTW_RPCResponse = Base_RPCResponse
-
-export type GRS_RPCResponse = Base_RPCResponse & {
-  ttsStatus: number;
-  data: string;
-  [key: string]: any;
-}
-
-type SSE_RPCResponse = Base_RPCResponse
-
-export type TTS_RPCResponse = SSB_RPCResponse | TXTW_RPCResponse | GRS_RPCResponse | SSE_RPCResponse
-
 export default function http<T> (url: string, method: string = 'POST', param: string): Promise<T> {
   return new Promise((resolve, reject) => {
     method = method.toUpperCase()

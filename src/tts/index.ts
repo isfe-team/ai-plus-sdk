@@ -1,84 +1,52 @@
 /*!
- * ai_plus_sdk | bqliu hxli
+ * tts of ai plus sdk | bqliu hxli
  *
  * @todo
  *  - [ ] Error 处理
  *  - [ ] 类型提取至类型模块
  *  - [ ] net/http 类型优化
  *  - [ ] rpcParam 入参构造优化
+ *  - [ ] api 设计<Promise?>
  */
 import { Base64 }  from 'js-base64'
-import http, { TTS_RPCResponse, RPCResponse, SSB_RPCResponse, GRS_RPCResponse } from '../shared/net/http'
+import http from '../shared/net/http'
+import { SSB_RPCParam_SP, TTS_RPCParam, RPCMessage, TTSStatus, SSE_RPCParam, TXTW_RPCParam, GRS_RPCParam, BaseRPCParam, TTS_RPCResponse, SSB_RPCResponse, GRS_RPCResponse, RPCResponse, SSB_RPCParam } from './types';
 
-enum TTSStatus {
-  idle = 'idle',        // 空闲
-  sessionBegin = 'ssb', // 会话开始
-  textWrite = 'txtw',   // 写入文本
-  getResult = 'grs',    // 获取结果
-  sessionEnd = 'sse'    // 会话结束
+export * from './types'
+
+export type TTSOption = SSB_RPCParam_SP & Pick<BaseRPCParam, 'extend_params'> & Pick<BaseRPCParam, 'appid'>
+
+export enum Error {
+  RESPONSE_ERROR,
+  NO_RESPONSE
 }
 
-interface IRPCMessage<T> {
-  id: number;
-  jsonrpc: string;
-  method: string;
-  params: T
+export interface AISdkError<T = any> {
+  AISdkError: true;
+  type: Error;
+  error?: T;
 }
 
-// extends SSB_RPCParam | TXTW_RPCParam | GRS_RPCParam | SSE_RPCParam
-interface RPCMessage<T> extends IRPCMessage<T> {
-  id: 1;
-  jsonrpc: '2.0';
-  method: 'deal_request',
-  params: T
+export function genError <T = any> (type: Error, error?: T): AISdkError<T> {
+  return {
+    AISdkError: true,
+    type,
+    error
+  }
 }
 
-interface BaseRPCParam {
-  appid: string;
-  cmd: TTSStatus;
-  extend_params: string;
-  sid: string;
-  svc: string;
-  syncid: string;
+export function isAISdkError (error: any): error is AISdkError {
+  return error.AISdkError === true
 }
 
-type SSB_RPCParam = BaseRPCParam & SSB_RPCParam_SP
-
-interface SSB_RPCParam_SP {
-  aue: string;
-  auf: string;
-  auth_id: string;
-  bgs: number;
-  engine_name: string;
-  pit: number;
-  ram: number;
-  spd: number;
-  vid: string,
-  vol: number;
-}
-
-type TXTW_RPCParam = BaseRPCParam & {
-  data: string;
-}
-
-type GRS_RPCParam = BaseRPCParam
-
-type SSE_RPCParam = BaseRPCParam & {
-  auth_id: string;
-}
-
-type TTS_RPCParam = SSB_RPCParam | TXTW_RPCParam | GRS_RPCParam | SSE_RPCParam
-
-type TTSOption = SSB_RPCParam_SP & Pick<BaseRPCParam, 'extend_params'> & Pick<BaseRPCParam, 'appid'>
-
-interface StartOption {
+export interface StartOption {
   url: string;
   text: string;
   apiMethod?: string;
   ttsOption: TTSOption;
 }
 
-interface TTSPayload {
+export interface TTSPayload {
   sid?: string;
   svc: string;
   syncid: string;
@@ -93,37 +61,60 @@ function genRPCMessage<T extends TTS_RPCParam> (rpcParam: T): RPCMessage<T> {
   }
 }
 
-export default class TTS {
-  public status: TTSStatus = TTSStatus.idle;
-  processPCMBase64Data: Function
+const dummyResolvedPromise = Promise.resolve()
 
-  constructor (fn: Function) {
-    this.processPCMBase64Data = fn
+// interact -> process -> interact -> process -> interact -> process -> interact
+// ssb error -> sse
+// ssb -> process error -> sse
+// ssb -> process -> txtw error -> sse
+// ssb -> process -> txtw -> process -> grs -> process -> grs -> process -> sse
+// ssb -> process -> txtw -> process -> grs -> process -> grs -> process -> sse error -> 
+export default class TTS {
+  end!: () => Promise<void | Promise<RPCResponse<TTS_RPCResponse>>>;
+  constructor (
+    public status: TTSStatus = TTSStatus.idle,
+    public processPCMBase64Data: Function,
+    public onError: Function
+  ) {
+    // only assignment
   }
 
   start (startOption: StartOption) {
     if (this.status !== TTSStatus.idle) {
       return
     }
-    const initialSyncId = -1
+    const initialSyncId = '-1'
     this.status = TTSStatus.sessionBegin
 
-    const rpcParam = startOption.ttsOption as SSB_RPCParam
-    rpcParam.cmd = this.status
-    
     const ttsPayload = {
       svc: 'tts',
-      syncid: initialSyncId.toString()
+      syncid: initialSyncId
     }
 
-    rpcParam.svc = ttsPayload.svc
+    const rpcParam: SSB_RPCParam = {
+      ...startOption.ttsOption,
+      cmd: this.status,
+      svc: ttsPayload.svc,
+      syncid: ttsPayload.syncid
+    }
 
-    this.getData(rpcParam, startOption, ttsPayload)
+    // user can invoke `end`
+    this.end = this._end.bind(this, startOption, ttsPayload)
+
+    return this.interact(rpcParam, startOption, ttsPayload)
+      .catch((err) => {
+        const error = genError(Error.NO_RESPONSE, err)
+        this.onErrorAdaptor(error)
+        if (this.status !== TTSStatus.sessionEnd && this.status !== TTSStatus.idle) {
+          return this._end(startOption, ttsPayload)
+        }
+        throw error
+      })
   }
 
-  end (startOption: StartOption, ttsPayload: TTSPayload) {
-    if   (this.status === TTSStatus.sessionEnd || this.status === TTSStatus.idle) {
-      return
+  private _end (startOption: StartOption, ttsPayload: TTSPayload) {
+    if (this.status === TTSStatus.sessionEnd || this.status === TTSStatus.idle) {
+      return dummyResolvedPromise
     }
     this.status = TTSStatus.sessionEnd
     const { appid, extend_params } = startOption.ttsOption
@@ -132,57 +123,62 @@ export default class TTS {
       appid,
       extend_params,
       cmd: this.status,
-      sid: ttsPayload.sid as string,
+      sid: ttsPayload.sid as string, // must exist
       syncid: ttsPayload.syncid,
       svc: ttsPayload.svc
     }
-    this.getData(rpcParam, startOption, ttsPayload).catch(() => {
+
+    return this.interact(rpcParam, startOption, ttsPayload).catch((err) => {
       this.status === TTSStatus.idle
+      throw err
     })
   }
 
-  onError (error: string = '') {
-    console.log(error)
+  private onErrorAdaptor (error: any) {
+    if (this.onError) {
+      this.onError(error)
+    }
   }
 
-  processResponse (rpcResponse: TTS_RPCResponse | void, startOption: StartOption, ttsPayload: TTSPayload) {
+  private processResponse (
+    rpcResponseWrapper: RPCResponse<TTS_RPCResponse>,
+    startOption: StartOption,
+    ttsPayload: TTSPayload
+  ): Promise<void | Promise<RPCResponse<TTS_RPCResponse>>> {
+    const { result: rpcResponse } = rpcResponseWrapper
     if (!rpcResponse) {
-      this.onError()
-      return
+      const error = genError(Error.NO_RESPONSE, rpcResponseWrapper)
+      this.onErrorAdaptor(error)
+      return Promise.reject(error)
     }
     if (rpcResponse.ret !== 0) {
-      this.onError('数据有误')
-      return
+      const error = genError(Error.RESPONSE_ERROR, rpcResponseWrapper)
+      this.onErrorAdaptor(error)
+      return Promise.reject(error)
+    }
+    const { appid, extend_params } = startOption.ttsOption
+    const basicParam = {
+      appid,
+
+      extend_params,
+      cmd: this.status,
+      sid: ttsPayload.sid || '',
+      syncid: ttsPayload.syncid,
+      svc: ttsPayload.svc
     }
     if (this.status === TTSStatus.sessionBegin) {
       ttsPayload.sid = (rpcResponse as SSB_RPCResponse).sid
       this.status = TTSStatus.textWrite
-      const { appid, extend_params } = startOption.ttsOption
       const rpcParam: TXTW_RPCParam = {
-        appid,
-        extend_params,
-        cmd: this.status,
-        sid: ttsPayload.sid,
-        syncid: ttsPayload.syncid,
-        svc: ttsPayload.svc,
+        ...basicParam,
         data: Base64.encode(startOption.text)
       }
-      this.getData(rpcParam, startOption, ttsPayload)
-      return
+      return this.interact(rpcParam, startOption, ttsPayload)
     }
     if (this.status === TTSStatus.textWrite) {
       this.status = TTSStatus.getResult
-      const { appid, extend_params } = startOption.ttsOption
-      const rpcParam: GRS_RPCParam = {
-        appid,
-        extend_params,
-        cmd: this.status,
-        sid: ttsPayload.sid as string,
-        syncid: ttsPayload.syncid,
-        svc: ttsPayload.svc
-      }
-      this.getData(rpcParam, startOption, ttsPayload)
-      return
+      const rpcParam: GRS_RPCParam = basicParam
+      return this.interact(rpcParam, startOption, ttsPayload)
     }
     if (this.status === TTSStatus.getResult) {
       const response = rpcResponse as GRS_RPCResponse
@@ -190,36 +186,27 @@ export default class TTS {
         this.processPCMBase64Data(response.data)
       }
       if (response.ttsStatus === 0) {
-        this.end(startOption, ttsPayload)
-        return
+        // or `this.end()`
+        return this._end(startOption, ttsPayload)
       }
-      const { appid, extend_params } = startOption.ttsOption
-      const rpcParam: GRS_RPCParam = {
-        appid,
-        extend_params,
-        cmd: this.status,
-        sid: ttsPayload.sid as string,
-        syncid: ttsPayload.syncid,
-        svc: ttsPayload.svc
-      }
-      this.getData(rpcParam, startOption, ttsPayload)
+      const rpcParam: GRS_RPCParam = basicParam
+      return this.interact(rpcParam, startOption, ttsPayload)
     }
     if (this.status === TTSStatus.sessionEnd) {
       this.status = TTSStatus.idle
+      return dummyResolvedPromise
     }
+    return dummyResolvedPromise
   }
 
-  getData (rpcParam: TTS_RPCParam, option: StartOption, ttsPayload: TTSPayload) {
+  interact (rpcParam: TTS_RPCParam, option: StartOption, ttsPayload: TTSPayload) {
+    // syncid ++
     ttsPayload.syncid = (+ttsPayload.syncid + 1).toString()
+
     const rpcMessage = genRPCMessage(rpcParam)
 
     return http<RPCResponse<TTS_RPCResponse>>(option.url, option.apiMethod, JSON.stringify(rpcMessage)).then((data) => {
-      this.processResponse(data.result, option, ttsPayload)
-      console.log(data.result)
-      return data.result
-    }).catch((err) => {
-      this.onError(err)
-      throw err
+      return this.processResponse(data, option, ttsPayload)
     })
   }
 }
