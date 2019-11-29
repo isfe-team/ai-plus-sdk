@@ -1,37 +1,44 @@
+/*!
+ * http | bqliu hxli
+ *
+ * a simple http client, just support the current demands, not a complete http client.
+ */
+
 import { Base64 } from 'js-base64'
 
-export default function http<T> (url: string, method: string = 'POST', param: string): Promise<T> {
+export interface HTTPOption {
+  url: string;
+  method?: string;
+  param?: string;
+  timeout?: number;
+}
+
+const defaultTimeout = 5 * 1000
+
+export default function http<T> ({ url = '', method = 'post', param = '', timeout = defaultTimeout }: HTTPOption = { } as HTTPOption): Promise<T> {
   return new Promise((resolve, reject) => {
     method = method.toUpperCase()
-    const xmlHttp = new XMLHttpRequest()
-    xmlHttp.open(method, url, true)
-    xmlHttp.timeout = 5 * 1000
-    xmlHttp.setRequestHeader('Content-Type', 'application/json-rpc')
-    xmlHttp.send(param)
-    xmlHttp.onreadystatechange = function () {
-      if (xmlHttp.readyState === 4) {
-        if (xmlHttp.status >= 200 && xmlHttp.status < 300) {
-          let ret = null
-          try {
-            ret = JSON.parse(Base64.atob(xmlHttp.responseText))
-          } catch(e) {
-            reject(e)
-            return
-          }
-          resolve(ret as T)
-          return
-        }
-
-        if (xmlHttp.status === 500) {
-          reject(new Error('系统异常'))
-          return
-        }
-        if (xmlHttp.status === 504) {
-          reject(new Error('网络超时'))
-          return
-        }
-        reject(new Error('请求失败'))
+    const xhr = new XMLHttpRequest()
+    xhr.open(method, url, true)
+    xhr.timeout = timeout
+    xhr.setRequestHeader('Content-Type', 'application/json-rpc')
+    xhr.send(param)
+    xhr.addEventListener('readystatechange', function () {
+      if (xhr.readyState !== xhr.DONE) {
+        return
       }
-    }
+      const { status } = xhr
+      if ((status >= 200 && status < 300) || status === 304) {
+        try {
+          const ret = JSON.parse(Base64.atob(xhr.responseText))
+          resolve(ret as T)
+        } catch(e) {
+          reject(e)
+        }
+        return
+      }
+
+      reject(xhr)
+    })
   })
 }

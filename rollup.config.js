@@ -4,8 +4,8 @@ import nodeResolve from 'rollup-plugin-node-resolve'
 import commonjs from 'rollup-plugin-commonjs'
 
 const inputs = [
-  ['src/tts/index.ts', 'TTS'],
-  ['src/tts/TTSWithPlayer.ts', 'TTSPlayer']
+  ['src/index.ts', 'AIPlus'],
+  ['src/tts/index.ts', 'TTS']
 ]
 
 const formats = [
@@ -18,6 +18,7 @@ function genConfigs () {
     const config = {
       input,
       plugins: [nodeResolve(), commonjs(), rollupTypescript()],
+      external: ['js-base64', 'lamejs', '@isfe/mse-player'],
       output: {
         name,
         format,
