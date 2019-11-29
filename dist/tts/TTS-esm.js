@@ -234,7 +234,6 @@ var TTS = /** @class */ (function () {
     };
     return TTS;
 }());
-//# sourceMappingURL=index.js.map
 
 export default TTS;
 export { Error, TTSStatus, genError, isAISdkError };
