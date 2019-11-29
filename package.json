@@ -1,6 +1,6 @@
 {
   "name": "@isfe/ai-plus-sdk",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "ai+ sdk, including tts/iat.",
   "main": "dist/aiplus/AIPlus.esm.js",
   "scripts": {
