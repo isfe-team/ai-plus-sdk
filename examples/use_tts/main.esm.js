@@ -217,31 +217,17 @@ function genError(type, error) {
         error: error
     };
 }
-//# sourceMappingURL=MSEPlayer.js.map
 
 /**
- * pcmToWav
- * @example
- * pcmToWav(file).then((src) => $audio.src = src)
+ * bufferToBase64
  */
-function pcmToWav(file, sampleRate, sampleBits, channelCount) {
-    if (sampleRate === void 0) { sampleRate = 16000; }
-    if (sampleBits === void 0) { sampleBits = 16; }
-    if (channelCount === void 0) { channelCount = 1; }
-    var reader = new FileReader();
-    // no need to `removeEventListener` if smart enough
-    var promise = new Promise(function (resolve, reject) {
-        reader.addEventListener('load', function () {
-            var buffer = addWavHeader(reader.result, sampleRate, sampleBits, channelCount);
-            resolve(bufferToBase64(buffer));
-        });
-        reader.addEventListener('error', function (err) {
-            reject(err);
-        });
-    });
-    reader.readAsArrayBuffer(file);
-    return promise;
+function bufferToBase64(buffer) {
+    var content = new Uint8Array(buffer).reduce(function (data, byte) {
+        return data + String.fromCharCode(byte);
+    }, '');
+    return "data:audio/wav;base64," + btoa(content);
 }
+
 /**
  * addWavHeader
  */
@@ -323,16 +309,86 @@ function addWavHeader(samples, sampleRate, sampleBits, channelCount) {
     }
     return view.buffer;
 }
+
 /**
- * bufferToBase64
+ * pcmToWav
+ * @example
+ * pcmToWav(file).then((src) => $audio.src = src)
  */
-function bufferToBase64(buffer) {
-    var content = new Uint8Array(buffer).reduce(function (data, byte) {
-        return data + String.fromCharCode(byte);
-    }, '');
-    return "data:audio/wav;base64," + btoa(content);
+function pcmToWav(file, sampleRate, sampleBits, channelCount) {
+    if (sampleRate === void 0) { sampleRate = 16000; }
+    if (sampleBits === void 0) { sampleBits = 16; }
+    if (channelCount === void 0) { channelCount = 1; }
+    var reader = new FileReader();
+    // no need to `removeEventListener` if smart enough
+    var promise = new Promise(function (resolve, reject) {
+        reader.addEventListener('load', function () {
+            var buffer = addWavHeader(reader.result, sampleRate, sampleBits, channelCount);
+            resolve(bufferToBase64(buffer));
+        });
+        reader.addEventListener('error', function (err) {
+            reject(err);
+        });
+    });
+    reader.readAsArrayBuffer(file);
+    return promise;
 }
-//# sourceMappingURL=pcmToWav.js.map
+
+function strToBase64 (str, options) {
+    var bstr = atob(str);
+    var n = bstr.length;
+    var u8arr = new Uint8Array(n);
+    while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new Blob([u8arr], options);
+}
+
+function base64ToBlob(str, options) {
+    return strToBase64(str.split(',')[1], options);
+}
+
+function base64ToWavBlob(str) {
+    return base64ToBlob(str, { type: 'wav' });
+}
+
+/**
+ * use [lamejs](https://github.com/zhuker/lamejs#real-example) to encode mp3
+ * @todo
+ *  - [ ] to `ts`
+ */
+
+function wavToMp3(buffers) {
+    return Promise.all(buffers.map(function (buf) { return new Promise(function (resolve, reject) {
+        var wav = lamejs.WavHeader.readHeader(new DataView(buf));
+        var samples = new Int16Array(buf, wav.dataOffset, wav.dataLen / 2);
+        var buffer = [];
+        var mp3enc = new lamejs.Mp3Encoder(wav.channels, wav.sampleRate, 128);
+        var remaining = samples.length;
+        var maxSamples = 1152;
+        for (var i = 0; remaining >= maxSamples; i += maxSamples) {
+            var mono = samples.subarray(i, i + maxSamples);
+            var mp3buf = mp3enc.encodeBuffer(mono);
+            if (mp3buf.length > 0) {
+                buffer.push(new Int8Array(mp3buf));
+            }
+            remaining -= maxSamples;
+        }
+        var flush = mp3enc.flush();
+        if (flush.length > 0) {
+            buffer.push(new Int8Array(flush));
+        }
+        var blob = new Blob(buffer, { type: 'audio/mpeg' });
+        var reader = new FileReader();
+        reader.addEventListener('load', function () {
+            resolve(reader.result);
+        });
+        reader.addEventListener('error', function (error) {
+            reject(error);
+        });
+        reader.readAsArrayBuffer(blob);
+    }); }));
+}
 
 var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
 
@@ -597,7 +653,6 @@ function http(_a) {
         });
     });
 }
-//# sourceMappingURL=http.js.map
 
 /*!
  * types | bqliu hxli
@@ -611,7 +666,6 @@ var TTSStatus;
     TTSStatus["getResult"] = "grs";
     TTSStatus["sessionEnd"] = "sse"; // 会话结束
 })(TTSStatus || (TTSStatus = {}));
-//# sourceMappingURL=types.js.map
 
 /*!
  * error | bqliu
@@ -628,7 +682,6 @@ function genError$1(type, error) {
         error: error
     };
 }
-//# sourceMappingURL=error.js.map
 
 /*!
  * tts of ai plus sdk | bqliu hxli
@@ -727,7 +780,7 @@ var TTS = /** @class */ (function () {
         if (this.status === TTSStatus.sessionBegin) {
             ttsPayload.sid = rpcResponse.sid;
             this.status = TTSStatus.textWrite;
-            var rpcParam = __assign(__assign({}, basicParam), { cmd: this.status, data: base64_1.encode(startOption.text) });
+            var rpcParam = __assign(__assign({}, basicParam), { cmd: this.status, sid: ttsPayload.sid, data: base64_1.encode(startOption.text) });
             return this.interact(rpcParam, startOption, ttsPayload);
         }
         if (this.status === TTSStatus.textWrite) {
@@ -769,50 +822,6 @@ var TTS = /** @class */ (function () {
     return TTS;
 }());
 
-/**
- * use [lamejs](https://github.com/zhuker/lamejs#real-example) to encode mp3
- * @todo
- *  - [ ] to `ts`
- */
-
-// import lamejs from 'lamejs'
-
-function wavToMp3 (buffers) {
-  return Promise.all(buffers.map((buf) => new Promise((resolve, reject) => {
-    const wav = lamejs.WavHeader.readHeader(new DataView(buf));
-    const samples = new Int16Array(buf, wav.dataOffset, wav.dataLen / 2);
-    const buffer = [ ];
-    const mp3enc = new lamejs.Mp3Encoder(wav.channels, wav.sampleRate, 128);
-
-    let remaining = samples.length;
-    const maxSamples = 1152;
-    for (let i = 0; remaining >= maxSamples; i += maxSamples) {
-      const mono = samples.subarray(i, i + maxSamples);
-      const mp3buf = mp3enc.encodeBuffer(mono);
-      if (mp3buf.length > 0) {
-        buffer.push(new Int8Array(mp3buf));
-      }
-      remaining -= maxSamples;
-    }
-
-    const flush = mp3enc.flush();
-    if (flush.length > 0){
-      buffer.push(new Int8Array(flush));
-    }
-
-    const blob = new Blob(buffer, { type: 'audio/mpeg' });
-    const reader = new FileReader();
-    reader.addEventListener('load', () => {
-      resolve(reader.result);
-    });
-    reader.addEventListener('error', (error) => {
-      reject(error);
-    });
-
-    reader.readAsArrayBuffer(blob);
-  })))
-}
-
 /*!
  * entry | bqliu
  */
@@ -820,51 +829,28 @@ var $audio = document.querySelector('audio');
 var tts = new TTS(function (base64PcmData) {
     if (base64PcmData) {
         Promise
-            .all([base64PcmData].map(function (base64PcmData) { return pcmToWav(base64ToBlob(base64PcmData, false)); }))
+            .all([base64PcmData].map(function (base64PcmData) { return pcmToWav(strToBase64(base64PcmData)); }))
             .then(function (base64WavData) {
-            var blobs = base64WavData.map(function (x) { return base64ToBlob(x); });
+            var blobs = base64WavData.map(function (x) { return base64ToWavBlob(x); });
             player.appendFiles(blobs, wavToMp3).then(function () { return $audio.play(); });
         });
     }
 });
 var player = null;
-var ttsOption = {
-    appid: 'test1234',
-    aue: 'raw',
-    auf: '4',
-    auth_id: '1234567890',
-    bgs: 0,
-    engine_name: 'tts_online',
-    extend_params: '{"params":"token=appid123,ability=ab_tts,vol=0,spd=0,pit=0,effect=0,bgs=0"}',
-    pit: 0,
-    ram: 0,
-    spd: 0,
-    vid: '65620',
-    vol: 0
-};
+var $param = document.querySelector('#param');
+var $extendParam = document.querySelector('#extend_param');
+var param = JSON.parse($param.value);
+var extendParam = $extendParam.value;
+var ttsOption = __assign(__assign({}, param), { extend_params: extendParam });
 var $input = document.querySelector('#selector');
 var $button = document.querySelector('#button');
 $button.addEventListener('click', function () {
     player = new MSEPlayer({ onError: console.log });
     $audio.src = URL.createObjectURL(player.mediaSource);
     tts.start({
-        url: 'http://172.31.3.142:8087/tts/',
-        // url: 'http://172.31.3.142:8087/tts_online/',
+        url: 'http://172.31.100.214:8444/tts/',
         text: $input.value,
         ttsOption: ttsOption
     });
 });
-function base64ToBlob(baseStr, isBase64) {
-    if (isBase64 === void 0) { isBase64 = true; }
-    var data = isBase64 ? baseStr.split(',')[1] : baseStr;
-    var bstr = atob(data);
-    var n = bstr.length;
-    var u8arr = new Uint8Array(n);
-    // 将二进制数据存入Uint8Array类型的数组中
-    while (n--) {
-        u8arr[n] = bstr.charCodeAt(n);
-    }
-    return new Blob([u8arr], { type: 'wav' });
-}
-//# sourceMappingURL=index.js.map
 //# sourceMappingURL=main.esm.js.map

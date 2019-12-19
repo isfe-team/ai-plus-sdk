@@ -2,12 +2,79 @@
 <html>
   <head>
     <meta charset="utf-8"/>
+    <script src="./node_modules/lamejs/lame.all.js"></script>
+    <style type="text/css">
+      * {
+        font-family: Microsoft YaHei;
+      }
+
+      .config {
+        display: flex;
+        margin-bottom: 2em;
+      }
+
+      .config label {
+        display: flex;
+        align-items: flex-start;
+        margin-right: 4em;
+      }
+
+      .config label span {
+        margin-right: 1em;
+      }
+
+      .player {
+        display: flex;
+        align-items: center;
+      }
+
+      .player * {
+        margin-right: 1em;
+      }
+
+      textarea {
+        resize: none;
+        border-radius: 4px;
+      }
+    </style>
   </head>
   <body>
-    <audio controls preload="auto"></audio>
-    <input type="text" id="selector">
-    <button id="button">播放</button>
-    <script src="./node_modules/lamejs/lame.all.js"></script>
+    <div>
+      <form class="config">
+        <label>
+          <span>参数</span>
+          <textarea rows="15" cols="40" name="param" id="param" value=""></textarea>
+        </label>
+        <label>
+          <span>extend_param</span>
+          <textarea rows="4" cols="80" name="extend_param" id="extend_param" value=""></textarea>
+        </label>
+      </form>
+      <div class="player">
+        <audio controls preload="auto"></audio>
+        <textarea rows="4" cols="40" id="selector" placeholder="请输入需要合成的文本"></textarea>
+        <button id="button">播放</button>
+      </div>
+    </div>
+    <script type="text/javascript">
+      var param = {
+        appid: 'test1234',
+        aue: 'raw',
+        auf: '4',
+        auth_id: '1234567890',
+        bgs: 0,
+        engine_name: 'tts_online',
+        pit: 0,
+        ram: 0,
+        spd: 0,
+        vid: '65620',
+        vol: 0
+      }
+      var extend_param = '{"params":"token=appid123,ability=ab_tts,vol=0,spd=0,pit=0,effect=0,bgs=0"}'
+
+      document.querySelector('#param').value = JSON.stringify(param, null, 2)
+      document.querySelector('#extend_param').value = extend_param
+    </script>
     <script type="module" src="./main.esm.js"></script>
   </body>
 </html>
