@@ -52,8 +52,10 @@
       </form>
       <div class="player">
         <audio controls preload="auto"></audio>
-        <textarea rows="4" cols="40" id="selector" placeholder="请输入需要合成的文本"></textarea>
+        <textarea rows="4" cols="60" id="selector" placeholder="请输入需要合成的文本"></textarea>
         <button id="button">播放</button>
+        <!-- <button id="pause">暂停</button> -->
+        <!-- <button id="stop">停止</button> -->
       </div>
     </div>
     <script type="text/javascript">
@@ -62,12 +64,12 @@
         aue: 'raw',
         auf: '4',
         auth_id: '1234567890',
-        bgs: 0,
+        // bgs: 0,
         engine_name: 'tts_online',
-        pit: 0,
-        ram: 0,
-        spd: 0,
-        vid: '65620',
+        // pit: 0,
+        // ram: 0, // no
+        // spd: 0,
+        vid: '65580',
         vol: 0
       }
       var extend_param = '{"params":"token=appid123,ability=ab_tts,vol=0,spd=0,pit=0,effect=0,bgs=0"}'

@@ -46,13 +46,13 @@ export interface SSB_RPCParam_SP {
   aue: string;
   auf: string;
   auth_id: string;
-  bgs: number;
+  bgs?: number;
   engine_name: string;
-  pit: number;
-  ram: number;
-  spd: number;
-  vid: string,
-  vol: number;
+  pit?: number;
+  ram?: number;
+  spd?: number;
+  vid: string;
+  vol?: number;
 }
 
 export type TXTW_RPCParam = BaseRPCParam & {

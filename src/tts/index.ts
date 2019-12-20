@@ -48,6 +48,7 @@ export default class TTS {
 
   constructor (
     public processPCMBase64Data: Function,
+    public onComplete?: Function,
     public onError?: Function
   ) {
     this.status = TTSStatus.idle
@@ -76,6 +77,7 @@ export default class TTS {
     this.end = this._end.bind(this, startOption, ttsPayload)
 
     return this.interact(rpcParam, startOption, ttsPayload)
+      .then(() => this.onCompleteAdaptor())
       .catch((err) => {
         const error = genError(Error.NO_RESPONSE, err)
         this.onErrorAdaptor(error)
@@ -103,9 +105,15 @@ export default class TTS {
     }
 
     return this.interact(rpcParam, startOption, ttsPayload).catch((err) => {
-      this.status === TTSStatus.idle
+      this.status = TTSStatus.idle
       throw err
     })
+  }
+
+  private onCompleteAdaptor () {
+    if (this.onComplete) {
+      this.onComplete()
+    }
   }
 
   private onErrorAdaptor (error: any) {

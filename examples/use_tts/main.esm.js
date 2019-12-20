@@ -48,6 +48,20 @@ function __spread() {
 }
 
 /**
+ * Simple helper | bqliu
+ */
+function readAsArrayBuffer$(x) {
+    return new Promise(function (resolve, reject) {
+        var fr = new FileReader();
+        // hmmm, no need to unbind, if it's smart enough
+        fr.addEventListener('load', function () { return resolve(fr.result); });
+        fr.addEventListener('error', function (e) { return reject(e); });
+        fr.readAsArrayBuffer(x);
+    });
+}
+//# sourceMappingURL=readAsArrayBuffer$.js.map
+
+/**
  * @example
  * const player = new MSEPlayer()
  * player.appendFiles(files)
@@ -136,18 +150,7 @@ var MSEPlayer = /** @class */ (function () {
  */
 function read(blobs) {
     return Promise.all(blobs.map(function (blob) {
-        return new Promise(function (resolve, reject) {
-            // hmmm, no need to unbind, if it's smart enough
-            var reader = new FileReader();
-            reader.addEventListener('load', function () {
-                // the result must be `ArrayBuffer`
-                resolve(reader.result);
-            });
-            reader.readAsArrayBuffer(blob);
-            reader.addEventListener('error', function (err) {
-                reject(genError('READ_FILE_ERROR', err));
-            });
-        });
+        return readAsArrayBuffer$(blob).then(null, function (err) { return Promise.reject(genError('READ_FILE_ERROR', err)); });
     }));
 }
 /**
@@ -217,16 +220,26 @@ function genError(type, error) {
         error: error
     };
 }
+//# sourceMappingURL=MSEPlayer.js.map
 
 /**
  * bufferToBase64
  */
-function bufferToBase64(buffer) {
+function bufferToBase64Wav(buffer) {
     var content = new Uint8Array(buffer).reduce(function (data, byte) {
         return data + String.fromCharCode(byte);
     }, '');
-    return "data:audio/wav;base64," + btoa(content);
+    return btoa(content);
 }
+//# sourceMappingURL=bufferToBase64.js.map
+
+/**
+ * bufferToBase64Wav
+ */
+function bufferToBase64Wav$1(buffer) {
+    return "data:audio/wav;base64," + bufferToBase64Wav(buffer);
+}
+//# sourceMappingURL=bufferToBase64Wav.js.map
 
 /**
  * addWavHeader
@@ -309,6 +322,7 @@ function addWavHeader(samples, sampleRate, sampleBits, channelCount) {
     }
     return view.buffer;
 }
+//# sourceMappingURL=addWavHeader.js.map
 
 /**
  * pcmToWav
@@ -319,22 +333,13 @@ function pcmToWav(file, sampleRate, sampleBits, channelCount) {
     if (sampleRate === void 0) { sampleRate = 16000; }
     if (sampleBits === void 0) { sampleBits = 16; }
     if (channelCount === void 0) { channelCount = 1; }
-    var reader = new FileReader();
-    // no need to `removeEventListener` if smart enough
-    var promise = new Promise(function (resolve, reject) {
-        reader.addEventListener('load', function () {
-            var buffer = addWavHeader(reader.result, sampleRate, sampleBits, channelCount);
-            resolve(bufferToBase64(buffer));
-        });
-        reader.addEventListener('error', function (err) {
-            reject(err);
-        });
+    return readAsArrayBuffer$(file).then(function (buffer) {
+        return bufferToBase64Wav$1(addWavHeader(buffer, sampleRate, sampleBits, channelCount));
     });
-    reader.readAsArrayBuffer(file);
-    return promise;
 }
+//# sourceMappingURL=pcmToWav.js.map
 
-function strToBase64 (str, options) {
+function base64WithoutPrefixToBlob (str, options) {
     var bstr = atob(str);
     var n = bstr.length;
     var u8arr = new Uint8Array(n);
@@ -343,52 +348,70 @@ function strToBase64 (str, options) {
     }
     return new Blob([u8arr], options);
 }
+//# sourceMappingURL=base64WithoutPrefixToBlob.js.map
 
 function base64ToBlob(str, options) {
-    return strToBase64(str.split(',')[1], options);
+    return base64WithoutPrefixToBlob(str.split(',')[1], options);
 }
+//# sourceMappingURL=base64ToBlob.js.map
 
 function base64ToWavBlob(str) {
     return base64ToBlob(str, { type: 'wav' });
 }
+//# sourceMappingURL=base64ToWavBlob.js.map
 
 /**
  * use [lamejs](https://github.com/zhuker/lamejs#real-example) to encode mp3
+ *
+ * BE CARE, if use rollup to import lamejs, you will fail, so you need to use
+ * [rollup-plugin-external-globals](https://github.com/eight04/rollup-plugin-external-globals)
+ * ```js
+ * // simple rollup config
+ * const config = {
+ *   plugins: [nodeResolve(), commonjs(), rollupTypescript(), externalGlobals({ lamejs: 'lamejs' })]
+ * }
+ * ```
  * @todo
- *  - [ ] to `ts`
+ *  - [ ] pcmToMp3
  */
-
-function wavToMp3(buffers) {
-    return Promise.all(buffers.map(function (buf) { return new Promise(function (resolve, reject) {
+function wavToMp3(mp3enc, buffers, _a) {
+    var _b = _a === void 0 ? {} : _a, _c = _b.kbps, kbps = _c === void 0 ? 128 : _c, _d = _b.flush, flush = _d === void 0 ? true : _d, _e = _b.optimize // if optimize, we'll slice into pieces, but it will result in unbelivable result
+    , optimize = _e === void 0 ? false : _e // if optimize, we'll slice into pieces, but it will result in unbelivable result
+    ;
+    return Promise.all(buffers.map(function (buf) {
         var wav = lamejs.WavHeader.readHeader(new DataView(buf));
         var samples = new Int16Array(buf, wav.dataOffset, wav.dataLen / 2);
         var buffer = [];
-        var mp3enc = new lamejs.Mp3Encoder(wav.channels, wav.sampleRate, 128);
-        var remaining = samples.length;
-        var maxSamples = 1152;
-        for (var i = 0; remaining >= maxSamples; i += maxSamples) {
-            var mono = samples.subarray(i, i + maxSamples);
-            var mp3buf = mp3enc.encodeBuffer(mono);
-            if (mp3buf.length > 0) {
-                buffer.push(new Int8Array(mp3buf));
-            }
-            remaining -= maxSamples;
+        if (!mp3enc) {
+            mp3enc = new lamejs.Mp3Encoder(wav.channels, wav.sampleRate, kbps);
         }
-        var flush = mp3enc.flush();
-        if (flush.length > 0) {
-            buffer.push(new Int8Array(flush));
+        if (optimize) {
+            var remaining = samples.length;
+            var maxSamples = 1152;
+            for (var i = 0; remaining >= maxSamples; i += maxSamples) {
+                var mono = samples.subarray(i, i + maxSamples);
+                var mp3buf = mp3enc.encodeBuffer(mono);
+                if (mp3buf.length > 0) {
+                    buffer.push(new Int8Array(mp3buf));
+                }
+                remaining -= maxSamples;
+            }
+        }
+        else {
+            var mp3buf = mp3enc.encodeBuffer(samples);
+            buffer.push(new Int8Array(mp3buf));
+        }
+        if (flush) {
+            var end = mp3enc.flush();
+            if (end.length > 0) {
+                buffer.push(new Int8Array(end));
+            }
         }
         var blob = new Blob(buffer, { type: 'audio/mpeg' });
-        var reader = new FileReader();
-        reader.addEventListener('load', function () {
-            resolve(reader.result);
-        });
-        reader.addEventListener('error', function (error) {
-            reject(error);
-        });
-        reader.readAsArrayBuffer(blob);
-    }); }));
+        return readAsArrayBuffer$(blob);
+    }));
 }
+//# sourceMappingURL=wavToMp3.js.map
 
 var commonjsGlobal = typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : typeof global !== 'undefined' ? global : typeof self !== 'undefined' ? self : {};
 
@@ -653,6 +676,7 @@ function http(_a) {
         });
     });
 }
+//# sourceMappingURL=http.js.map
 
 /*!
  * types | bqliu hxli
@@ -666,6 +690,7 @@ var TTSStatus;
     TTSStatus["getResult"] = "grs";
     TTSStatus["sessionEnd"] = "sse"; // 会话结束
 })(TTSStatus || (TTSStatus = {}));
+//# sourceMappingURL=types.js.map
 
 /*!
  * error | bqliu
@@ -682,6 +707,7 @@ function genError$1(type, error) {
         error: error
     };
 }
+//# sourceMappingURL=error.js.map
 
 /*!
  * tts of ai plus sdk | bqliu hxli
@@ -702,8 +728,9 @@ var dummyResolvedPromise = Promise.resolve();
 // ssb -> process -> txtw -> process -> grs -> process -> grs -> process -> sse
 // ssb -> process -> txtw -> process -> grs -> process -> grs -> process -> sse error -> 
 var TTS = /** @class */ (function () {
-    function TTS(processPCMBase64Data, onError) {
+    function TTS(processPCMBase64Data, onComplete, onError) {
         this.processPCMBase64Data = processPCMBase64Data;
+        this.onComplete = onComplete;
         this.onError = onError;
         this.status = TTSStatus.idle;
     }
@@ -722,6 +749,7 @@ var TTS = /** @class */ (function () {
         // user can invoke `end`
         this.end = this._end.bind(this, startOption, ttsPayload);
         return this.interact(rpcParam, startOption, ttsPayload)
+            .then(function () { return _this.onCompleteAdaptor(); })
             .catch(function (err) {
             var error = genError$1(Error.NO_RESPONSE, err);
             _this.onErrorAdaptor(error);
@@ -748,9 +776,14 @@ var TTS = /** @class */ (function () {
             svc: ttsPayload.svc
         };
         return this.interact(rpcParam, startOption, ttsPayload).catch(function (err) {
-            _this.status === TTSStatus.idle;
+            _this.status = TTSStatus.idle;
             throw err;
         });
+    };
+    TTS.prototype.onCompleteAdaptor = function () {
+        if (this.onComplete) {
+            this.onComplete();
+        }
     };
     TTS.prototype.onErrorAdaptor = function (error) {
         if (this.onError) {
@@ -821,36 +854,64 @@ var TTS = /** @class */ (function () {
     };
     return TTS;
 }());
+//# sourceMappingURL=index.js.map
 
 /*!
  * entry | bqliu
  */
+
 var $audio = document.querySelector('audio');
+var lastAppend$ = Promise.resolve();
+// lamejs.Mp3Encoder
+var mp3Enc = null;
 var tts = new TTS(function (base64PcmData) {
-    if (base64PcmData) {
-        Promise
-            .all([base64PcmData].map(function (base64PcmData) { return pcmToWav(strToBase64(base64PcmData)); }))
-            .then(function (base64WavData) {
-            var blobs = base64WavData.map(function (x) { return base64ToWavBlob(x); });
-            player.appendFiles(blobs, wavToMp3).then(function () { return $audio.play(); });
-        });
+    // base64 pcm -> pcm blob -> wav blob -> mp3 ArrayBuffer
+    if (!base64PcmData) {
+        return;
     }
+    // 依序
+    lastAppend$.then(function () { return Promise
+        .all([base64PcmData].map(function (base64PcmData) { return pcmToWav(base64WithoutPrefixToBlob(base64PcmData)); }))
+        .then(function (base64WavData) {
+        var blobs = base64WavData.map(function (x) { return base64ToWavBlob(x); });
+        function transform(xs) {
+            if (!mp3Enc) {
+                mp3Enc = new lamejs.Mp3Encoder(1, 16000, 64);
+            }
+            return wavToMp3(mp3Enc, xs, { kbps: 64, flush: false });
+        }
+        return player.appendFiles(blobs, transform).then(function () { return $audio.play(); });
+    }); });
+}, function () {
+    if (mp3Enc) {
+        var flush = mp3Enc.flush();
+        if (flush.length > 0) {
+            var blob = new Blob([flush]);
+            player.appendFiles([blob]).then(function () { return $audio.play(); });
+        }
+    }
+    mp3Enc = null;
+}, function () {
+    console.log();
+    mp3Enc = null;
 });
 var player = null;
-var $param = document.querySelector('#param');
-var $extendParam = document.querySelector('#extend_param');
-var param = JSON.parse($param.value);
-var extendParam = $extendParam.value;
-var ttsOption = __assign(__assign({}, param), { extend_params: extendParam });
 var $input = document.querySelector('#selector');
 var $button = document.querySelector('#button');
 $button.addEventListener('click', function () {
     player = new MSEPlayer({ onError: console.log });
     $audio.src = URL.createObjectURL(player.mediaSource);
+    var $param = document.querySelector('#param');
+    var $extendParam = document.querySelector('#extend_param');
+    var param = JSON.parse($param.value);
+    var extendParam = $extendParam.value;
+    // 拿到并组装参数
+    var ttsOption = __assign(__assign({}, param), { extend_params: extendParam });
     tts.start({
-        url: 'http://172.31.100.214:8444/tts/',
+        url: '/tts',
         text: $input.value,
         ttsOption: ttsOption
     });
 });
+//# sourceMappingURL=index.js.map
 //# sourceMappingURL=main.esm.js.map
