@@ -95,6 +95,9 @@ var TTSStatus;
 
 /*!
  * tts of ai plus sdk | bqliu hxli
+ *
+ * @todo
+ *  - [ ] `end` 后 start 的请求需要能 cancel，可以考虑基于 `Observable` 来设计
  */
 function genRPCMessage(rpcParam) {
     return {
@@ -112,9 +115,11 @@ var dummyResolvedPromise = Promise.resolve();
 // ssb -> process -> txtw -> process -> grs -> process -> grs -> process -> sse
 // ssb -> process -> txtw -> process -> grs -> process -> grs -> process -> sse error -> 
 var TTS = /** @class */ (function () {
-    function TTS(processPCMBase64Data, onError) {
+    function TTS(processPCMBase64Data, onSuccess, onError, onComplete) {
         this.processPCMBase64Data = processPCMBase64Data;
+        this.onSuccess = onSuccess;
         this.onError = onError;
+        this.onComplete = onComplete;
         this.status = TTSStatus.idle;
     }
     TTS.prototype.start = function (startOption) {
@@ -132,6 +137,7 @@ var TTS = /** @class */ (function () {
         // user can invoke `end`
         this.end = this._end.bind(this, startOption, ttsPayload);
         return this.interact(rpcParam, startOption, ttsPayload)
+            .then(function () { return _this.onSuccessAdaptor(); })
             .catch(function (err) {
             var error = genError(Error.NO_RESPONSE, err);
             _this.onErrorAdaptor(error);
@@ -139,7 +145,8 @@ var TTS = /** @class */ (function () {
                 return _this._end(startOption, ttsPayload);
             }
             throw error;
-        });
+        })
+            .finally(function () { return _this.onCompleteAdaptor(); });
     };
     TTS.prototype._end = function (startOption, ttsPayload) {
         var _this = this;
@@ -147,6 +154,10 @@ var TTS = /** @class */ (function () {
             return dummyResolvedPromise;
         }
         this.status = TTSStatus.sessionEnd;
+        // if failed, sid is not exist
+        if (!ttsPayload.sid) {
+            return dummyResolvedPromise;
+        }
         var _a = startOption.ttsOption, appid = _a.appid, extend_params = _a.extend_params;
         var rpcParam = {
             auth_id: startOption.ttsOption.auth_id,
@@ -158,9 +169,19 @@ var TTS = /** @class */ (function () {
             svc: ttsPayload.svc
         };
         return this.interact(rpcParam, startOption, ttsPayload).catch(function (err) {
-            _this.status === TTSStatus.idle;
+            _this.status = TTSStatus.idle;
             throw err;
         });
+    };
+    TTS.prototype.onSuccessAdaptor = function () {
+        if (this.onSuccess) {
+            this.onSuccess();
+        }
+    };
+    TTS.prototype.onCompleteAdaptor = function () {
+        if (this.onComplete) {
+            this.onComplete();
+        }
     };
     TTS.prototype.onErrorAdaptor = function (error) {
         if (this.onError) {
@@ -231,7 +252,11 @@ var TTS = /** @class */ (function () {
     };
     return TTS;
 }());
+function getResolvedPromise(value) {
+    return Promise.resolve(value);
+}
+function noop() { }
 
 export default TTS;
-export { Error, TTSStatus, genError, isAISdkError };
+export { Error, TTSStatus, genError, getResolvedPromise, isAISdkError, noop };
 //# sourceMappingURL=AIPlus.esm.js.map

@@ -223,4 +223,3 @@ export function getResolvedPromise<T> (value?: T) {
 }
 
 export function noop () { }
-

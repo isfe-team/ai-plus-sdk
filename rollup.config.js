@@ -5,7 +5,8 @@ import commonjs from 'rollup-plugin-commonjs'
 
 const inputs = [
   ['src/index.ts', 'AIPlus'],
-  ['src/tts/index.ts', 'TTS']
+  ['src/tts/index.ts', 'TTS'],
+  ['src/tts/TTSWithPlayer.ts', 'TTSWithPlayer']
 ]
 
 const formats = [

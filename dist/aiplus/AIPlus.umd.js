@@ -96,6 +96,9 @@
 
   /*!
    * tts of ai plus sdk | bqliu hxli
+   *
+   * @todo
+   *  - [ ] `end` 后 start 的请求需要能 cancel，可以考虑基于 `Observable` 来设计
    */
   function genRPCMessage(rpcParam) {
       return {
@@ -113,9 +116,11 @@
   // ssb -> process -> txtw -> process -> grs -> process -> grs -> process -> sse
   // ssb -> process -> txtw -> process -> grs -> process -> grs -> process -> sse error -> 
   var TTS = /** @class */ (function () {
-      function TTS(processPCMBase64Data, onError) {
+      function TTS(processPCMBase64Data, onSuccess, onError, onComplete) {
           this.processPCMBase64Data = processPCMBase64Data;
+          this.onSuccess = onSuccess;
           this.onError = onError;
+          this.onComplete = onComplete;
           this.status = exports.TTSStatus.idle;
       }
       TTS.prototype.start = function (startOption) {
@@ -133,6 +138,7 @@
           // user can invoke `end`
           this.end = this._end.bind(this, startOption, ttsPayload);
           return this.interact(rpcParam, startOption, ttsPayload)
+              .then(function () { return _this.onSuccessAdaptor(); })
               .catch(function (err) {
               var error = genError(exports.Error.NO_RESPONSE, err);
               _this.onErrorAdaptor(error);
@@ -140,7 +146,8 @@
                   return _this._end(startOption, ttsPayload);
               }
               throw error;
-          });
+          })
+              .finally(function () { return _this.onCompleteAdaptor(); });
       };
       TTS.prototype._end = function (startOption, ttsPayload) {
           var _this = this;
@@ -148,6 +155,10 @@
               return dummyResolvedPromise;
           }
           this.status = exports.TTSStatus.sessionEnd;
+          // if failed, sid is not exist
+          if (!ttsPayload.sid) {
+              return dummyResolvedPromise;
+          }
           var _a = startOption.ttsOption, appid = _a.appid, extend_params = _a.extend_params;
           var rpcParam = {
               auth_id: startOption.ttsOption.auth_id,
@@ -159,9 +170,19 @@
               svc: ttsPayload.svc
           };
           return this.interact(rpcParam, startOption, ttsPayload).catch(function (err) {
-              _this.status === exports.TTSStatus.idle;
+              _this.status = exports.TTSStatus.idle;
               throw err;
           });
+      };
+      TTS.prototype.onSuccessAdaptor = function () {
+          if (this.onSuccess) {
+              this.onSuccess();
+          }
+      };
+      TTS.prototype.onCompleteAdaptor = function () {
+          if (this.onComplete) {
+              this.onComplete();
+          }
       };
       TTS.prototype.onErrorAdaptor = function (error) {
           if (this.onError) {
@@ -232,10 +253,16 @@
       };
       return TTS;
   }());
+  function getResolvedPromise(value) {
+      return Promise.resolve(value);
+  }
+  function noop() { }
 
   exports.default = TTS;
   exports.genError = genError;
+  exports.getResolvedPromise = getResolvedPromise;
   exports.isAISdkError = isAISdkError;
+  exports.noop = noop;
 
   Object.defineProperty(exports, '__esModule', { value: true });
 
