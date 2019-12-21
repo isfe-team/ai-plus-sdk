@@ -10,6 +10,11 @@ $ npm i -S @isfe/ai-plus-sdk @isfe/mse-player js-base64 lamejs
 
 ## Refs
 
+### tts
+
+- [sdk data flow](https://www.processon.com/diagraming/5dcbcec6e4b0e3a6348db16d)
+- [sdk data flow2](https://www.processon.com/diagraming/5ddc7d57e4b07f8de341918d)
+
 ## Todos
 
 ### basic
