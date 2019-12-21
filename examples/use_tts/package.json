@@ -1,6 +1,6 @@
 {
-  "name": "tts",
-  "version": "0.2.0",
+  "name": "tts-demo",
+  "version": "0.3.0",
   "description": "ai+ sdk, including tts/iat.",
   "main": "dist/aiplus/AIPlus-esm.js",
   "scripts": {
@@ -28,7 +28,7 @@
   },
   "homepage": "https://github.com/isfe-team/ai-plus-sdk#readme",
   "dependencies": {
-    "@isfe/ai-plus-sdk": "^0.4.2",
+    "@isfe/ai-plus-sdk": "^0.4.3",
     "@isfe/mse-player": "^0.4.0",
     "js-base64": "^2.5.1",
     "lamejs": "^1.2.0"
