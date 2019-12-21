@@ -1,5 +1,8 @@
 /*!
  * tts of ai plus sdk | bqliu hxli
+ *
+ * @todo
+ *  - [ ] `end` 后 start 的请求需要能 cancel，可以考虑基于 `Observable` 来设计
  */
 
 import { Base64 }  from 'js-base64'
@@ -43,13 +46,14 @@ const dummyResolvedPromise = Promise.resolve()
 // ssb -> process -> txtw -> process -> grs -> process -> grs -> process -> sse
 // ssb -> process -> txtw -> process -> grs -> process -> grs -> process -> sse error -> 
 export default class TTS {
-  end!: () => Promise<void | Promise<RPCResponse<TTS_RPCResponse>>>;
+  end!: (() => Promise<void | Promise<RPCResponse<TTS_RPCResponse>>>) | null;
   public status: TTSStatus;
 
   constructor (
     public processPCMBase64Data: Function,
-    public onComplete?: Function,
-    public onError?: Function
+    public onSuccess?: Function,
+    public onError?: Function,
+    public onComplete?: Function
   ) {
     this.status = TTSStatus.idle
   }
@@ -77,8 +81,8 @@ export default class TTS {
     this.end = this._end.bind(this, startOption, ttsPayload)
 
     return this.interact(rpcParam, startOption, ttsPayload)
-      .then(() => this.onCompleteAdaptor())
-      .catch((err) => {
+      .then(() => this.onSuccessAdaptor())
+      .catch((err: any) => {
         const error = genError(Error.NO_RESPONSE, err)
         this.onErrorAdaptor(error)
         if (this.status !== TTSStatus.sessionEnd && this.status !== TTSStatus.idle) {
@@ -86,6 +90,7 @@ export default class TTS {
         }
         throw error
       })
+      .finally(() => this.onCompleteAdaptor())
   }
 
   private _end (startOption: StartOption, ttsPayload: TTSPayload) {
@@ -93,13 +98,17 @@ export default class TTS {
       return dummyResolvedPromise
     }
     this.status = TTSStatus.sessionEnd
+    // if failed, sid is not exist
+    if (!ttsPayload.sid) {
+      return dummyResolvedPromise
+    }
     const { appid, extend_params } = startOption.ttsOption
     const rpcParam: SSE_RPCParam = {
       auth_id: startOption.ttsOption.auth_id,
       appid,
       extend_params,
       cmd: this.status,
-      sid: ttsPayload.sid as string, // must exist
+      sid: ttsPayload.sid,
       syncid: ttsPayload.syncid,
       svc: ttsPayload.svc
     }
@@ -108,6 +117,12 @@ export default class TTS {
       this.status = TTSStatus.idle
       throw err
     })
+  }
+
+  private onSuccessAdaptor () {
+    if (this.onSuccess) {
+      this.onSuccess()
+    }
   }
 
   private onCompleteAdaptor () {
@@ -202,3 +217,10 @@ export default class TTS {
     })
   }
 }
+
+export function getResolvedPromise<T> (value?: T) {
+  return Promise.resolve(value)
+}
+
+export function noop () { }
+

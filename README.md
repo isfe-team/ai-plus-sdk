@@ -16,6 +16,7 @@ $ npm i -S @isfe/ai-plus-sdk @isfe/mse-player js-base64 lamejs
 
 - [x] 优化 `externals`，将 `js-base64`、`@isfe/mse-player`
 - [ ] 完善 examples
+- [ ] 使用 `Observable` 重构
 
 ### shared
 
@@ -28,7 +29,9 @@ $ npm i -S @isfe/ai-plus-sdk @isfe/mse-player js-base64 lamejs
 - [x] 类型提取至类型模块
 - [x] `rpcParam` 入参构造优化
 - [x] api 设计<Promise?>
-- [ ] 实现 auth
+- [ ] <del>实现 auth</del>
+- [x] 提取 `TTSWithPlayer`
+- [x] 增加使用 `TTSWithPlayer` 的 demo
 
 ### iat
 

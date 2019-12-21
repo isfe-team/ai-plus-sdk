@@ -42,5 +42,8 @@
     "@isfe/mse-player": "^0.2.1",
     "js-base64": "^2.5.1",
     "lamejs": "^1.2.0"
+  },
+  "dependencies": {
+    "@isfe/mse-player": "^0.4.0"
   }
 }
