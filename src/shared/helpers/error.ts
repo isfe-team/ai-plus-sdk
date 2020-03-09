@@ -4,7 +4,9 @@
 
 export enum Error {
   RESPONSE_ERROR = 'RESPONSE_ERROR',
-  NO_RESPONSE = 'NO_RESPONSE'
+  NO_RESPONSE = 'NO_RESPONSE',
+  NOT_SUPPORTED_TYPE = 'NOT_SUPPORTED_TYPE',
+  GET_TYPE_ERROR = 'GET_TYPE_ERROR'
 }
 
 export interface AISdkError<T = any> {
