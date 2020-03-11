@@ -1,33 +1,43 @@
-export interface callbackObject {
+interface WsCallback {
+  onOpen: Function
+  onMessage: Function
+  onError: Function
+  onClose: Function
+}
+
+interface WebSocket {
   onopen: Function
   onmessage: Function
   onerror: Function
   onclose: Function
-
+  send: Function
+  readyState: Number
+  close: Function
 }
 export default class wsHttp {
-  ws!: WebSocket | any
-  constructor (url: string, callback: callbackObject) {
-    this.ws = null
+  ws!: WebSocket | null
+  constructor () { }
+  connect (url: string, wsCallback: WsCallback) {
     if (this.ws === null || this.ws.readyState !== WebSocket.OPEN) {
-      this.ws = new WebSocket(url)
-      this.ws.onopen = callback.onopen
-      this.ws.onmessage = callback.onmessage
-      this.ws.onerror = callback.onerror
-      this.ws.onclose = callback.onclose
+      this.ws = new WebSocket(url) as WebSocket
+      this.ws.onopen = wsCallback.onOpen
+      this.ws.onmessage = wsCallback.onMessage
+      this.ws.onerror = wsCallback.onError
+      this.ws.onclose = wsCallback.onClose
     }
-  }
+}
   send (data: object) {
-    if (this.ws.readyState === WebSocket.CLOSED || this.ws.readyState === WebSocket.CLOSING) {
+    if ((this.ws as WebSocket).readyState === WebSocket.CLOSED || (this.ws as WebSocket).readyState === WebSocket.CLOSING) {
       return
     }
-    this.ws.send(JSON.stringify(data))
+    (this.ws as WebSocket).send(JSON.stringify(data))
   }
 
   disconnect () {
-    if (this.ws.readyState === WebSocket.CLOSED || this.ws.readyState === WebSocket.CLOSING) {
+    if ((this.ws as WebSocket).readyState === WebSocket.CLOSED || (this.ws as WebSocket).readyState === WebSocket.CLOSING) {
       return
     }
-    this.ws.close()
+    (this.ws as WebSocket).close()
+    this.ws = null
   }
 }
