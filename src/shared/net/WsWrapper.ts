@@ -3,6 +3,7 @@ interface WsCallback {
   onMessage: Function
   onError: Function
   onClose: Function
+  url: string
 }
 
 interface WebSocket {
@@ -17,9 +18,10 @@ interface WebSocket {
 export default class wsHttp {
   ws!: WebSocket | null
   constructor () { }
-  connect (url: string, wsCallback: WsCallback) {
-    if (this.ws === null || this.ws.readyState !== WebSocket.OPEN) {
-      this.ws = new WebSocket(url) as WebSocket
+  connect (wsCallback: WsCallback) {
+    this.ws = null
+    if (this.ws === null || (this.ws as WebSocket).readyState !== WebSocket.OPEN) {
+      this.ws = new WebSocket(wsCallback.url) as WebSocket
       this.ws.onopen = wsCallback.onOpen
       this.ws.onmessage = wsCallback.onMessage
       this.ws.onerror = wsCallback.onError

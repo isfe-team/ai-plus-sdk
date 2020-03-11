@@ -2,6 +2,8 @@ import { genError, Error } from '../shared/helpers/error'
 import { resampleWorker, speexWork } from './worker'
 
 interface AudioHandlerCallback {
+  isSpeex: Boolean
+  isResample: Boolean
   onAudioChunk: Function
   onError?: Function
 }
@@ -19,12 +21,10 @@ export default class audioCtxt {
   onAudioChunk: Function
   onError: Function
   constructor (
-    isSpeex: Boolean,
-    isResample: Boolean,
     AudioHandlerCallback: AudioHandlerCallback,
   ) {
-    this.isResample = isResample || true
-    this.isSpeex = isSpeex || true
+    this.isResample = AudioHandlerCallback.isResample || true
+    this.isSpeex = AudioHandlerCallback.isSpeex || true
     this.speexWorker = new Worker(speexWork())
     this.resampleWorker = new Worker(resampleWorker())
     this.recordStatus = false
@@ -58,7 +58,8 @@ export default class audioCtxt {
         audioScriptNode.onaudioprocess = (e) => {
           // 如果处于录音状态，继续传递录到的音频，反之断开AudioContext连接
           if (this.recordStatus) {
-            callback(e.inputBuffer.getChannelData(0))
+            const result = new Float32Array(e.inputBuffer.getChannelData(0)).buffer
+            callback(result)
           } else {
             // 断开AudioContext连接
             audioSource.disconnect()
@@ -67,16 +68,16 @@ export default class audioCtxt {
         }
       }).catch((error) => {
         const newError = genError(Error.NO_RESPONSE, error.message)
-        this.onErrorAdaptor(newError)
+        this.onError(newError)
       })
     } else {
       const error = genError(Error.NOT_SUPPORTED_TYPE, 'navigator.mediaDevices is not supported')
-      this.onErrorAdaptor(error)
+      this.onError(error)
     }
   }
 
    // 重采样阶段
-   useResampleWorker (buffer: ArrayBuffer) {
+   useResampleWorker (buffer: ArrayBuffer, callback: Function) {
     this.resampleWorker.postMessage({
       command: 'record',
       buffer: buffer
@@ -84,10 +85,9 @@ export default class audioCtxt {
     this.resampleWorker.onmessage = (e: any) => {
       let buffer = e.data.buffer
       let data = new Int16Array(buffer)
-      const result = new Int8Array(data.buffer)
-      return Promise.resolve(result)
+      const result = new Int8Array(data).buffer
+      callback(result)
     }
-    return Promise.reject(buffer)
   }
 
   // 音频压缩阶段
@@ -108,32 +108,25 @@ export default class audioCtxt {
         let buffer = e.data.buffer
         result = new Int8Array(buffer)
       }
-      return Promise.resolve(result)
+      this.onAudioChunk(result)
     }
-    return Promise.reject(buffer)
   }
 
   handleBuffer (buffer: ArrayBuffer) {
     if (this.isSpeex && !this.isResample) {
-      return this.useSpeexWorker(buffer).then((buffer) => this.onAudioChunk(buffer))
+      return this.useSpeexWorker(buffer)
     }
     if (this.isResample && !this.isSpeex) {
-      return this.useResampleWorker(buffer).then((buffer) => this.onAudioChunk(buffer))
+      return this.useResampleWorker(buffer, this.onAudioChunk.bind(this))
     }
     if (this.isSpeex && this.isResample) {
-      return this.useResampleWorker(buffer).then((buffer) => this.useSpeexWorker(buffer)).then((buffer) => this.onAudioChunk(buffer))
+      return this.useResampleWorker(buffer, this.useSpeexWorker.bind(this))
     }
     return this.onAudioChunk(buffer)
   }
 
   manage () {
-    this.record(this.handleBuffer)
-  }
-
-  private onErrorAdaptor (error: any) {
-    if (this.onError) {
-      this.onError(error)
-    }
+    this.record(this.handleBuffer.bind(this))
   }
 
   stop () {

@@ -1,6 +1,6 @@
 import { Base64 }  from 'js-base64'
-import wsHttp from '../shared/net/wsHttp'
-import audioCtxt from './audioHandle'
+import wsHttp from '../shared/net/WsWrapper'
+import audioCtxt from './audioHandler'
 import { IATStatus, SSBParamType, SSBOnlyParamType, IAT_RPCParam, BaseParam, BaseRPCParam, ParamResponse, IATResponse, SSB_Response, AUWParamType, AUW_Response, GRSParamType, GRS_Response, SSEParamType } from './type'
 import { genError, Error } from '../shared/helpers/error';
 
@@ -86,6 +86,7 @@ export default class Iat {
     }
     // 初始话websocket
     const wsCallback = {
+      url: startOption.url,
       onOpen: () => {
         this.sendWSApi(startOption, iatPayload, IATStatus.sessionBegin)
       },
@@ -104,13 +105,13 @@ export default class Iat {
       }
     }
     this.ws.disconnect()
-    this.ws.connect(startOption.url, wsCallback)
+    this.ws.connect(wsCallback)
     this.getResult.bind(this, startOption, iatPayload)
     if (this.audioCtxt) {
       this.audioCtxt.stop()
     } else {
       // 启动麦克风
-      this.audioCtxt = new audioCtxt(true, true, { onAudioChunk: this.onAudioChunk.bind(this, ...arguments, startOption,  iatPayload)})
+      this.audioCtxt = new audioCtxt({isResample: true, isSpeex: true, onAudioChunk: this.onAudioChunk.bind(this, startOption, iatPayload) })
     }
   }
 
@@ -192,7 +193,7 @@ export default class Iat {
     }
   }
 
-  onAudioChunk(data: any, startOption: StartOption, iatPayload: IatPayload) {
+  onAudioChunk(startOption: StartOption, iatPayload: IatPayload, data: ArrayBuffer) {
     if (this.status === IATStatus.getResult || iatPayload.sid == null) {
       return
     }
@@ -201,7 +202,7 @@ export default class Iat {
       this.sendWSApi(startOption, iatPayload, IATStatus.audioWrite)
       iatPayload.frameCnt = 0
     }
-    iatPayload.recorderBuffer.push(new Uint8Array(data.buffer))
+    iatPayload.recorderBuffer.push(new Uint8Array(data))
     iatPayload.frameCnt = iatPayload.frameCnt + 1
   }
 

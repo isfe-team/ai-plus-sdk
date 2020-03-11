@@ -7,7 +7,7 @@ const inputs = [
   ['src/index.ts', 'AIPlus'],
   ['src/tts/index.ts', 'TTS'],
   ['src/tts/TTSWithPlayer.ts', 'TTSWithPlayer']
-  ['src/iat/index.ts', 'IAT']
+  ['src/iat/Iat.ts', 'IAT']
 ]
 
 const formats = [
