@@ -1,13 +1,14 @@
 import { Base64 }  from 'js-base64'
-import wsHttp from '../shared/net/WsWrapper'
-import audioCtxt from './audioHandler'
-import { IATStatus, SSBParamType, SSBOnlyParamType, IAT_RPCParam, BaseParam, BaseRPCParam, ParamResponse, IATResponse, SSB_Response, AUWParamType, AUW_Response, GRSParamType, GRS_Response, SSEParamType } from './type'
+import WsWrapper from '../shared/net/WsWrapper'
+import AudioHandler from './AudioHandler'
+import { IATStatus, SSBParamType, SSBOnlyParamType, IAT_RPCParam, BaseRPCParam, ParamResponse, IATResponse, SSB_Response, AUWParamType, AUW_Response, GRSParamType, GRS_Response, SSEParamType } from './type'
 import { genError, Error } from '../shared/helpers/error';
 
 type iatParam = SSBOnlyParamType & Pick<BaseRPCParam, 'appid'> & Pick<BaseRPCParam, 'uid'> & Pick<BaseRPCParam, 'type'>
 export interface StartOption {
   url: string;
   isSpeex: Boolean;
+  isResample: Boolean;
   iatParam: iatParam;
 }
 
@@ -23,16 +24,17 @@ interface IatPayload {
   recorderBuffer: Array<ArrayBuffer>;
 }
 
-function genRPCMessage<T extends IAT_RPCParam> (rpcParam: T): BaseParam<T> {
-  return {
+function genRPCMessage<T extends IAT_RPCParam> (rpcParam: T): string {
+  const data = {
     id: 1,
     jsonrpc: '2.0',
     method: 'request',
     params: rpcParam
   }
+  return JSON.stringify(data)
 }
 
-interface IatCallbacks {
+interface IatOption {
   onStart?: Function
   onEnd?: Function
   onMessage?: Function
@@ -52,23 +54,23 @@ function identity (value?: any) {
 // 6. 收到结果应答，当recStatus为5时发送会话结束指令，结束会话
 
 export default class Iat {
-  public status: IATStatus
-  audioCtxt: audioCtxt | null
-  ws: wsHttp
-  onStart: Function
-  onMessage: Function
-  onError: Function
-  onEnd: Function
+  status: IATStatus
+  audioHandler: AudioHandler | null
+  ws: WsWrapper
+  private onStart: Function
+  private onMessage: Function
+  private onError: Function
+  private onEnd: Function
   constructor (
-    iatCallbacks: IatCallbacks
+    iatOption: IatOption
   ) {
     this.status = IATStatus.idle
-    this.audioCtxt = null
-    this.ws = new wsHttp()
-    this.onStart = iatCallbacks.onStart || identity
-    this.onEnd = iatCallbacks.onEnd || identity
-    this.onMessage = iatCallbacks.onMessage || identity
-    this.onError = iatCallbacks.onError || identity
+    this.audioHandler = null
+    this.ws = new WsWrapper()
+    this.onStart = iatOption.onStart || identity
+    this.onMessage = iatOption.onMessage || identity
+    this.onError = iatOption.onError || identity
+    this.onEnd = iatOption.onEnd || identity
   }
 
   start(startOption: StartOption) {
@@ -88,12 +90,12 @@ export default class Iat {
     const wsCallback = {
       url: startOption.url,
       onOpen: () => {
-        this.sendWSApi(startOption, iatPayload, IATStatus.sessionBegin)
+        this.send(startOption, iatPayload, IATStatus.sessionBegin)
       },
       onMessage: (obj: any) => {
         try {
           const ret = JSON.parse(obj.data)
-          this.processServerMsg.call(this, ret, startOption, iatPayload)
+          this.processServerMessage.call(this, ret, startOption, iatPayload)
         } catch (ex) { }
       },
       onClose: () => {
@@ -107,16 +109,16 @@ export default class Iat {
     this.ws.disconnect()
     this.ws.connect(wsCallback)
     this.getResult.bind(this, startOption, iatPayload)
-    if (this.audioCtxt) {
-      this.audioCtxt.stop()
+    if (this.audioHandler) {
+      this.audioHandler.stop()
     } else {
       // 启动麦克风
-      this.audioCtxt = new audioCtxt({isResample: true, isSpeex: true, onAudioChunk: this.onAudioChunk.bind(this, startOption, iatPayload) })
+      this.audioHandler = new AudioHandler({isResample: startOption.isResample || true, isSpeex: startOption.isSpeex, onAudioChunk: this.processAudioMessage.bind(this, startOption, iatPayload) })
     }
   }
 
   // 针对不同的阶段发送不同的请求
-  private sendWSApi (startOption: StartOption, iatPayload: IatPayload, type: string) {
+  private send (startOption: StartOption, iatPayload: IatPayload, type: Omit<IATStatus, 'idle'>) {
     // SSB
     if (type === IATStatus.sessionBegin) {
       const rpcParam: SSBParamType = {
@@ -193,53 +195,9 @@ export default class Iat {
     }
   }
 
-  onAudioChunk(startOption: StartOption, iatPayload: IatPayload, data: ArrayBuffer) {
-    if (this.status === IATStatus.getResult || iatPayload.sid == null) {
-      return
-    }
-    this.status = IATStatus.audioWrite
-    if (iatPayload.frameCnt >= iatPayload.frameSend) {
-      this.sendWSApi(startOption, iatPayload, IATStatus.audioWrite)
-      iatPayload.frameCnt = 0
-    }
-    iatPayload.recorderBuffer.push(new Uint8Array(data))
-    iatPayload.frameCnt = iatPayload.frameCnt + 1
-  }
-
-  end (startOption: StartOption, iatPayload: IatPayload) {
-    this.audioCtxt ? this.audioCtxt.stop() : ''
-    this.status = IATStatus.sessionEnd
-    if (this.status === IATStatus.sessionEnd && iatPayload.sid != null) {
-      this.sendWSApi(startOption, iatPayload, IATStatus.sessionEnd)
-    }
-    this.status = IATStatus.idle
-  }
-
-  getResult (startOption: StartOption, iatPayload: IatPayload) {
-    this.audioCtxt ? this.audioCtxt.stop() : ''
-    if (this.status === IATStatus.audioWrite) {
-      this.sendWSApi(startOption, iatPayload, IATStatus.audioWrite)
-      // 然后执行录音发送完毕信号
-      iatPayload.frameCnt = 0
-      iatPayload.audioData = ''
-      iatPayload.audiolen = '0'
-      iatPayload.audioStatus = '4'
-      this.sendWSApi(startOption, iatPayload, IATStatus.audioWrite)
-      iatPayload.synid = '0'
-      iatPayload.audioStatus = '1'
-      iatPayload.recorderBuffer = []
-      this.status = IATStatus.getResult
-    }
-    if (this.status === IATStatus.getResult) {
-      this.sendWSApi(startOption, iatPayload, IATStatus.getResult)
-    } else {
-      this.end(startOption, iatPayload)
-    }
-  }
-
-  private processServerMsg (
+  private processServerMessage (
     rpcResponseWrapper: ParamResponse<IATResponse>,
-    StartOption: StartOption,
+    startOption: StartOption,
     iatPayload: IatPayload
   ) {
     const { result: rpcResponse } = rpcResponseWrapper
@@ -250,7 +208,7 @@ export default class Iat {
     }
     const { cmd, ret } = rpcResponse
     if (ret !== 0) {
-      this.end(StartOption, iatPayload)
+      this.end(startOption, iatPayload)
       const error = genError(Error.RESPONSE_ERROR, rpcResponseWrapper)
       this.onError(error)
       return
@@ -258,7 +216,7 @@ export default class Iat {
     if (cmd === IATStatus.sessionBegin) {
       iatPayload.sid = (rpcResponse as SSB_Response).sid
       // 开始录音操作
-      this.audioCtxt ? this.audioCtxt.start() : identity()
+      this.audioHandler ? this.audioHandler.start() : identity()
       // 用户在此时可以进行开始操作
       this.onStart()
       return
@@ -274,7 +232,7 @@ export default class Iat {
       }
       if (recStatus === 5) {
         this.onMessage({ end: true, pgs: iatpgs, result: iatrst })
-        this.end(StartOption, iatPayload)
+        this.end(startOption, iatPayload)
       }
       return
     }
@@ -288,11 +246,11 @@ export default class Iat {
       const iatrst = (rpcResponse as GRS_Response).iatrst
       const iatpgs = (rpcResponse as GRS_Response).pgs
       if (resultStatus === 5) {
-        this.end(StartOption, iatPayload)
+        this.end(startOption, iatPayload)
         this.onMessage({end: true, pgs: iatpgs, result: iatrst})
         return
       }
-      this.getResult(StartOption, iatPayload)
+      this.getResult(startOption, iatPayload)
       this.onMessage({end: false, pgs: iatpgs, result: iatrst})
       return
     }
@@ -303,5 +261,49 @@ export default class Iat {
     }
     const error = genError(Error.RESPONSE_ERROR, rpcResponse.ret)
     this.onError(error)
+  }
+
+  private processAudioMessage(startOption: StartOption, iatPayload: IatPayload, buffer: ArrayBuffer) {
+    if (this.status === IATStatus.getResult || iatPayload.sid == null) {
+      return
+    }
+    this.status = IATStatus.audioWrite
+    if (iatPayload.frameCnt >= iatPayload.frameSend) {
+      this.send(startOption, iatPayload, IATStatus.audioWrite)
+      iatPayload.frameCnt = 0
+    }
+    iatPayload.recorderBuffer.push(new Uint8Array(buffer))
+    iatPayload.frameCnt = iatPayload.frameCnt + 1
+  }
+
+  end (startOption: StartOption, iatPayload: IatPayload) {
+    this.audioHandler ? this.audioHandler.stop() : ''
+    this.status = IATStatus.sessionEnd
+    if (this.status === IATStatus.sessionEnd && iatPayload.sid != null) {
+      this.send(startOption, iatPayload, IATStatus.sessionEnd)
+    }
+    this.status = IATStatus.idle
+  }
+
+  getResult (startOption: StartOption, iatPayload: IatPayload) {
+    this.audioHandler ? this.audioHandler.stop() : ''
+    if (this.status === IATStatus.audioWrite) {
+      this.send(startOption, iatPayload, IATStatus.audioWrite)
+      // 然后执行录音发送完毕信号
+      iatPayload.frameCnt = 0
+      iatPayload.audioData = ''
+      iatPayload.audiolen = '0'
+      iatPayload.audioStatus = '4'
+      this.send(startOption, iatPayload, IATStatus.audioWrite)
+      iatPayload.synid = '0'
+      iatPayload.audioStatus = '1'
+      iatPayload.recorderBuffer = []
+      this.status = IATStatus.getResult
+    }
+    if (this.status === IATStatus.getResult) {
+      this.send(startOption, iatPayload, IATStatus.getResult)
+    } else {
+      this.end(startOption, iatPayload)
+    }
   }
 }

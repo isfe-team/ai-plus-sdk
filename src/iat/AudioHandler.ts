@@ -1,7 +1,7 @@
 import { genError, Error } from '../shared/helpers/error'
-import { resampleWorker, speexWork } from './worker'
+import { resampleWorkerCode, speexWorkerCode } from './WorkerUtils'
 
-interface AudioHandlerCallback {
+interface AudioOption {
   isSpeex: Boolean
   isResample: Boolean
   onAudioChunk: Function
@@ -13,23 +13,23 @@ function identity (value?: any) {
 }
 
 export default class audioCtxt {
-  speexWorker: Worker
-  resampleWorker: Worker
-  recordStatus: Boolean
-  isSpeex: Boolean
-  isResample: Boolean
-  onAudioChunk: Function
-  onError: Function
+  private onAudioChunk: Function
+  private onError: Function
+  private speexWorker: Worker
+  private resampleWorker: Worker
+  private recordStatus: Boolean
+  private isResample: Boolean
+  private isSpeex: Boolean
   constructor (
-    AudioHandlerCallback: AudioHandlerCallback,
+    audioOption: AudioOption,
   ) {
-    this.isResample = AudioHandlerCallback.isResample || true
-    this.isSpeex = AudioHandlerCallback.isSpeex || true
-    this.speexWorker = new Worker(speexWork())
-    this.resampleWorker = new Worker(resampleWorker())
+    this.onAudioChunk = audioOption.onAudioChunk
+    this.onError = audioOption.onError || identity
+    this.speexWorker = new Worker(speexWorkerCode())
+    this.resampleWorker = new Worker(resampleWorkerCode())
     this.recordStatus = false
-    this.onAudioChunk = AudioHandlerCallback.onAudioChunk
-    this.onError = AudioHandlerCallback.onError || identity
+    this.isResample = audioOption.isResample || true
+    this.isSpeex = audioOption.isSpeex || true
   }
 
   start() {
@@ -45,8 +45,8 @@ export default class audioCtxt {
     this.manage()
   }
 
-  // 录音阶段，有输入音频就返回输入音频，反之进行录音
-  record (callback: Function) {
+  // 录音阶段
+  private record (callback: Function) {
     if (navigator.mediaDevices) {
       navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => { // 获取麦克风音频流
         const context = new AudioContext()  // 创建音频上下文
@@ -77,7 +77,7 @@ export default class audioCtxt {
   }
 
    // 重采样阶段
-   useResampleWorker (buffer: ArrayBuffer, callback: Function) {
+  private resample (buffer: ArrayBuffer, callback: Function) {
     this.resampleWorker.postMessage({
       command: 'record',
       buffer: buffer
@@ -91,7 +91,7 @@ export default class audioCtxt {
   }
 
   // 音频压缩阶段
-  useSpeexWorker (buffer: ArrayBuffer) {
+  private speex (buffer: ArrayBuffer) {
     const output = new Int8Array([])
     const inData = new Int16Array(buffer)
     this.speexWorker.postMessage({
@@ -108,24 +108,24 @@ export default class audioCtxt {
         let buffer = e.data.buffer
         result = new Int8Array(buffer)
       }
-      this.onAudioChunk(result)
+      this.onAudioChunk(result.buffer)
     }
   }
 
-  handleBuffer (buffer: ArrayBuffer) {
+  private handleBuffer (buffer: ArrayBuffer) {
     if (this.isSpeex && !this.isResample) {
-      return this.useSpeexWorker(buffer)
+      return this.speex(buffer)
     }
     if (this.isResample && !this.isSpeex) {
-      return this.useResampleWorker(buffer, this.onAudioChunk.bind(this))
+      return this.resample(buffer, this.onAudioChunk.bind(this))
     }
     if (this.isSpeex && this.isResample) {
-      return this.useResampleWorker(buffer, this.useSpeexWorker.bind(this))
+      return this.resample(buffer, this.speex.bind(this))
     }
     return this.onAudioChunk(buffer)
   }
 
-  manage () {
+  private manage () {
     this.record(this.handleBuffer.bind(this))
   }
 

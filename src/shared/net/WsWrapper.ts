@@ -1,9 +1,9 @@
-interface WsCallback {
+interface WsOption {
+  url: string
   onOpen: Function
   onMessage: Function
   onError: Function
   onClose: Function
-  url: string
 }
 
 interface WebSocket {
@@ -12,27 +12,28 @@ interface WebSocket {
   onerror: Function
   onclose: Function
   send: Function
-  readyState: Number
   close: Function
+  readyState: Number
 }
 export default class wsHttp {
-  ws!: WebSocket | null
-  constructor () { }
-  connect (wsCallback: WsCallback) {
+  private ws: WebSocket | null
+  constructor () {
     this.ws = null
+  }
+  connect (WsOption: WsOption) {
     if (this.ws === null || (this.ws as WebSocket).readyState !== WebSocket.OPEN) {
-      this.ws = new WebSocket(wsCallback.url) as WebSocket
-      this.ws.onopen = wsCallback.onOpen
-      this.ws.onmessage = wsCallback.onMessage
-      this.ws.onerror = wsCallback.onError
-      this.ws.onclose = wsCallback.onClose
+      this.ws = new WebSocket(WsOption.url) as WebSocket
+      this.ws.onopen = WsOption.onOpen
+      this.ws.onmessage = WsOption.onMessage
+      this.ws.onerror = WsOption.onError
+      this.ws.onclose = WsOption.onClose
     }
-}
-  send (data: object) {
+  }
+  send<T = any>(data: T) {
     if ((this.ws as WebSocket).readyState === WebSocket.CLOSED || (this.ws as WebSocket).readyState === WebSocket.CLOSING) {
       return
     }
-    (this.ws as WebSocket).send(JSON.stringify(data))
+    (this.ws as WebSocket).send(data)
   }
 
   disconnect () {
