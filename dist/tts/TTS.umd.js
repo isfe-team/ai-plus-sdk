@@ -82,6 +82,8 @@
     (function (Error) {
         Error["RESPONSE_ERROR"] = "RESPONSE_ERROR";
         Error["NO_RESPONSE"] = "NO_RESPONSE";
+        Error["NOT_SUPPORTED_TYPE"] = "NOT_SUPPORTED_TYPE";
+        Error["GET_TYPE_ERROR"] = "GET_TYPE_ERROR";
     })(exports.Error || (exports.Error = {}));
     function genError(type, error) {
         return {

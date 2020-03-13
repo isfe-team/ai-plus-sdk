@@ -37,7 +37,6 @@ export default class audioCtxt {
     this.resampleWorker.postMessage({
       command: 'init',
       config: {
-        sampleRate: 4800,
         outputBufferLength: 0
       }
     })
@@ -59,7 +58,7 @@ export default class audioCtxt {
           // 如果处于录音状态，继续传递录到的音频，反之断开AudioContext连接
           if (this.recordStatus) {
             const result = new Float32Array(e.inputBuffer.getChannelData(0)).buffer
-            callback(result)
+            callback(result, context.sampleRate)
           } else {
             // 断开AudioContext连接
             audioSource.disconnect()
@@ -77,15 +76,15 @@ export default class audioCtxt {
   }
 
    // 重采样阶段
-  private resample (buffer: ArrayBuffer, callback: Function) {
+  private resample (buffer: ArrayBuffer, sampleRate: Number, callback: Function) {
     this.resampleWorker.postMessage({
       command: 'record',
-      buffer: buffer
+      buffer: buffer,
+      sampleRate: sampleRate
     })
     this.resampleWorker.onmessage = (e: any) => {
       let buffer = e.data.buffer
-      let data = new Int16Array(buffer)
-      const result = new Int8Array(data).buffer
+      let result = new Int16Array(buffer).buffer
       callback(result)
     }
   }
@@ -102,25 +101,24 @@ export default class audioCtxt {
       outData: output,
       outOffset: 0
     })
-    let result = new Int8Array([])
     this.speexWorker.onmessage = (e:any) => {
       if (e.data.command === 'encode') {
         let buffer = e.data.buffer
-        result = new Int8Array(buffer)
+        const result = new Int8Array(buffer)
+        this.onAudioChunk(result.buffer)
       }
-      this.onAudioChunk(result.buffer)
     }
   }
 
-  private handleBuffer (buffer: ArrayBuffer) {
+  private handleBuffer (buffer: ArrayBuffer, sampleRate: Number) {
     if (this.isSpeex && !this.isResample) {
       return this.speex(buffer)
     }
     if (this.isResample && !this.isSpeex) {
-      return this.resample(buffer, this.onAudioChunk.bind(this))
+      return this.resample(buffer, sampleRate, this.onAudioChunk.bind(this))
     }
     if (this.isSpeex && this.isResample) {
-      return this.resample(buffer, this.speex.bind(this))
+      return this.resample(buffer, sampleRate, this.speex.bind(this))
     }
     return this.onAudioChunk(buffer)
   }
