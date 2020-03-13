@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <title>audio</title>
+</head>
+<body>
+  <button>停止</button>
+  <script type="module">
+    var $button = document.querySelector('button')
+    import audioHandler from '../../dist/audioHandler/AudioHandler.esm.js'
+    const audio = new audioHandler({isSpeex: true, isResample: true, onAudioChunk: getAudioData.bind(this)})
+    audio.start()
+    function getAudioData (data) {
+      console.log(data)
+    }
+    $button.addEventListener('click', function () {
+      audio.stop()
+    })
+  </script>
+</body>

@@ -28,8 +28,8 @@ export default class AudioHandler {
     this.speexWorker = speexWorkerCode()
     this.resampleWorker = resampleWorkerCode()
     this.recordStatus = false
-    this.isResample = audioOption.isResample || true
-    this.isSpeex = audioOption.isSpeex || true
+    this.isResample = audioOption.isResample
+    this.isSpeex = audioOption.isSpeex
   }
 
   start () {
@@ -81,7 +81,7 @@ export default class AudioHandler {
   private resample (buffer: ArrayBuffer, sampleRate: Number, callback: Function) {
     this.resampleWorker.postMessage({
       command: 'record',
-      buffer: buffer,
+      buffer: new Float64Array(buffer),
       sampleRate: sampleRate
     })
     this.resampleWorker.addEventListener('message', (e) => {
