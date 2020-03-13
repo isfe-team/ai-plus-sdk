@@ -7,14 +7,14 @@ import { genError, Error } from '../shared/helpers/error';
 type iatParam = SSBOnlyParamType & Pick<BaseRPCParam, 'appid'> & Pick<BaseRPCParam, 'uid'> & Pick<BaseRPCParam, 'type'>
 export interface StartOption {
   url: string;
-  isSpeex: Boolean;
-  isResample: Boolean;
-  frameSend: number;
   iatParam: iatParam;
+  isSpeex?: Boolean;
+  isResample?: Boolean;
+  frameSend?: number;
 }
 
 interface IatPayload {
-  sid?: any;
+  sid: string | null;
   svc: string;
   synid: string;
   audioStatus: string; // 音频状态 2表示未完成
@@ -35,6 +35,10 @@ function genRPCMessage<T extends IAT_RPCParam> (rpcParam: T): string {
   return JSON.stringify(data)
 }
 
+function identity<T> (value: T) {
+  return value
+}
+
 interface IatOption {
   onStart?: Function
   onEnd?: Function
@@ -42,8 +46,8 @@ interface IatOption {
   onError?: Function
 }
 
-function identity (value?: any) {
-  return value
+interface Response {
+  data: string
 }
 
 // 整体流程
@@ -74,11 +78,11 @@ export default class Iat {
     this.onEnd = iatOption.onEnd || identity
   }
 
-  start(startOption: StartOption) {
+  start (startOption: StartOption) {
     this.status = IATStatus.sessionBegin
     const iatPayload = {
       svc: 'iat',
-      sid: '0',
+      sid: null,
       synid: '0',
       audioStatus: '1',
       audiolen: '0',
@@ -87,15 +91,15 @@ export default class Iat {
       frameSend: startOption.frameSend || 6,
       recorderBuffer: []
     }
-    // 初始话websocket
+    // 初始化websocket
     const wsCallback = {
       url: startOption.url,
       onOpen: () => {
         this.send(startOption, iatPayload, IATStatus.sessionBegin)
       },
-      onMessage: (obj: any) => {
+      onMessage: (result: Response) => {
         try {
-          const ret = JSON.parse(obj.data)
+          const ret = JSON.parse(result.data)
           this.processServerMessage.call(this, ret, startOption, iatPayload)
         } catch (ex) { }
       },
@@ -114,7 +118,7 @@ export default class Iat {
       this.audioHandler.stop()
     } else {
       // 启动麦克风
-      this.audioHandler = new AudioHandler({isResample: startOption.isResample || true, isSpeex: startOption.isSpeex, onAudioChunk: this.processAudioMessage.bind(this, startOption, iatPayload) })
+      this.audioHandler = new AudioHandler({isResample: startOption.isResample || true, isSpeex: startOption.isSpeex || true, onAudioChunk: this.processAudioMessage.bind(this, startOption, iatPayload)})
     }
   }
 
@@ -130,90 +134,86 @@ export default class Iat {
       this.ws.send(genRPCMessage(rpcParam))
       return
     }
-    // AUW
-    if (type === IATStatus.audioWrite) {
-      if (iatPayload.recorderBuffer.length === 0) {
+    if (iatPayload.sid) {
+      const commonParam = {
+        sid: iatPayload.sid,
+        appid: startOption.iatParam.appid,
+        cmd: this.status,
+        svc: iatPayload.svc,
+        uid: startOption.iatParam.uid,
+      }
+      // AUW
+      if (type === IATStatus.audioWrite) {
+        if (iatPayload.recorderBuffer.length === 0) {
+          return
+        }
+        const frameSize = 43 // 帧长 43bit
+        const audioLength = iatPayload.recorderBuffer.length * frameSize
+        let str = ''
+        const output = iatPayload.recorderBuffer.splice(0, iatPayload.recorderBuffer.length)
+        const outputArray = new Int8Array(audioLength)
+        for (let i = 0; i < output.length; i++) {
+          outputArray.set(new Int8Array(output[i]), i * frameSize)
+        }
+        for (let i = 0; i < audioLength; i++) {
+          str = str +  String.fromCharCode(outputArray[i])
+        }
+        iatPayload.audiolen = audioLength.toString()
+        iatPayload.audioData = Base64.btoa(str)
+        (+iatPayload.synid + 1).toString()
+        let audioStatus = iatPayload.audioStatus
+        if (iatPayload.audioStatus === '1') {
+          iatPayload.audioStatus = '2'
+        } else {
+          audioStatus = '2'
+        }
+        const rpcParam: AUWParamType = {
+          ...commonParam,
+          synid: iatPayload.synid,
+          audioStatus: audioStatus,
+          audiolen: iatPayload.audiolen,
+          data: iatPayload.audioData
+        }
+        this.ws.send(genRPCMessage(rpcParam))
+        iatPayload.frameCnt = 0
         return
       }
-      const frameSize = 43 // 帧长 43bit
-      const audioLength = iatPayload.recorderBuffer.length * frameSize
-      let str = ''
-      const output = iatPayload.recorderBuffer.splice(0, iatPayload.recorderBuffer.length)
-      const outputArray = new Int8Array(audioLength)
-      for (let i = 0; i < output.length; i++) {
-        const view = new Int8Array(output[i])
-        outputArray.set(view, i * frameSize)
+      // GRS
+      if (type === IATStatus.getResult) {
+        const rpcParam: GRSParamType = {
+          ...commonParam,
+          type: startOption.iatParam.type
+        }
+        this.ws.send(genRPCMessage(rpcParam))
+        return
       }
-      for (let i = 0; i < audioLength; i++) {
-        str = str +  String.fromCharCode(outputArray[i])
+      // SSE
+      if (type === IATStatus.sessionEnd) {
+        const rpcParam: SSEParamType = {
+          ...commonParam,    
+          type: startOption.iatParam.type
+        }
+        this.ws.send(genRPCMessage(rpcParam))
       }
-      iatPayload.audioData = Base64.btoa(str)
-      iatPayload.audiolen = audioLength.toString();
-      (+iatPayload.synid + 1).toString()
-      let audioStatus = iatPayload.audioStatus
-      if (iatPayload.audioStatus === '1') {
-        iatPayload.audioStatus = '2'
-      } else {
-        audioStatus = '2'
-      }
-      const rpcParam: AUWParamType = {
-        sid: iatPayload.sid,
-        svc: iatPayload.svc,
-        synid: iatPayload.synid,
-        appid: startOption.iatParam.appid,
-        cmd: this.status,
-        audioStatus: audioStatus,
-        audiolen: iatPayload.audiolen,
-        data: iatPayload.audioData,
-        uid: startOption.iatParam.uid
-      }
-      this.ws.send(genRPCMessage(rpcParam))
-      iatPayload.frameCnt = 0
-      return
-    }
-    // GRS
-    if (type === IATStatus.getResult) {
-      const rpcParam: GRSParamType = {
-        appid: startOption.iatParam.appid,
-        cmd: this.status,
-        sid: iatPayload.sid,
-        svc: iatPayload.svc,
-        uid: startOption.iatParam.uid,
-        type: startOption.iatParam.type
-      }
-      this.ws.send(genRPCMessage(rpcParam))
-      return
-    }
-    // SSE
-    if (type === IATStatus.sessionEnd) {
-      const rpcParam: SSEParamType = {
-        appid: startOption.iatParam.appid,
-        cmd: this.status,
-        sid: iatPayload.sid,
-        svc: iatPayload.svc,
-        uid: startOption.iatParam.uid,
-        type: startOption.iatParam.type
-      }
-      this.ws.send(genRPCMessage(rpcParam))
     }
   }
 
   // ws返回的结果处理过程
   private processServerMessage (
-    rpcResponseWrapper: ParamResponse<IATResponse>,
+    responseMessage: ParamResponse<IATResponse>,
     startOption: StartOption,
     iatPayload: IatPayload
   ) {
-    const { result: rpcResponse } = rpcResponseWrapper
+    const { result: rpcResponse } = responseMessage
     if (!rpcResponse) {
-      const error = genError(Error.NO_RESPONSE, rpcResponseWrapper)
+      const error = genError(Error.NO_RESPONSE, responseMessage)
       this.onError(error)
       return
     }
     const { cmd, ret } = rpcResponse
     if (ret !== 0) {
       this.end(startOption, iatPayload)
-      const error = genError(Error.RESPONSE_ERROR, rpcResponseWrapper)
+      const error = genError(Error.RESPONSE_ERROR, responseMessage)
       this.onError(error)
       return
     }
@@ -244,7 +244,7 @@ export default class Iat {
     }
     if (cmd === IATStatus.getResult) {
       if (this.status !== IATStatus.getResult) {
-        const error = genError(Error.RESPONSE_ERROR, rpcResponseWrapper)
+        const error = genError(Error.RESPONSE_ERROR, responseMessage)
         this.onError(error)
         return
       }
@@ -274,7 +274,7 @@ export default class Iat {
   }
 
   // 拿到处理后的录音结果
-  private processAudioMessage(startOption: StartOption, iatPayload: IatPayload, buffer: ArrayBuffer) {
+  private processAudioMessage (startOption: StartOption, iatPayload: IatPayload, buffer: ArrayBuffer) {
     if (this.status === IATStatus.getResult || iatPayload.sid == null) {
       return
     }
@@ -301,9 +301,11 @@ export default class Iat {
   
   // 外部控制，当外部执行手动暂停或结束时走的
   stop (startOption: StartOption, iatPayload: IatPayload) {
-    this.audioHandler ? this.audioHandler.stop() : ''
+    if (this.audioHandler) {
+      this.audioHandler.stop()
+    }
     if (this.status === IATStatus.audioWrite) {
-      // 先执行audioWrite录音的内容都发送掉
+      // 先将录音的内容都发送掉
       this.send(startOption, iatPayload, IATStatus.audioWrite)
       // 然后执行录音发送完毕信号
       iatPayload.frameCnt = 0

@@ -8,7 +8,7 @@ interface AudioOption {
   onError?: Function
 }
 
-function identity (value?: any) {
+function identity<T> (value: T) {
   return value
 }
 
@@ -25,8 +25,8 @@ export default class AudioHandler {
   ) {
     this.onAudioChunk = audioOption.onAudioChunk
     this.onError = audioOption.onError || identity
-    this.speexWorker = new Worker(speexWorkerCode())
-    this.resampleWorker = new Worker(resampleWorkerCode())
+    this.speexWorker = speexWorkerCode()
+    this.resampleWorker = resampleWorkerCode()
     this.recordStatus = false
     this.isResample = audioOption.isResample || true
     this.isSpeex = audioOption.isSpeex || true
@@ -49,22 +49,24 @@ export default class AudioHandler {
     if (navigator.mediaDevices) {
       navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => { // 获取麦克风音频流
         const context = new AudioContext()  // 创建音频上下文
-        let audioSource = context.createMediaStreamSource(stream) // 创建节点
-        let audioScriptNode = context.createScriptProcessor(0, 1, 1) // 用于使用js直接操作音频数据 buffer暂时取0，选取该环境最适合的缓冲区大小
+        const audioSource = context.createMediaStreamSource(stream) // 创建节点
+        const audioScriptNode = context.createScriptProcessor(0, 1, 1) // 用于使用js直接操作音频数据 buffer暂时取0，选取该环境最适合的缓冲区大小
         audioSource.connect(audioScriptNode) // 将音频流输出到jsnode中
         audioScriptNode.connect(context.destination) // 将音频流输出到扬声器
-          // 满足分片的buffer时触发
-        audioScriptNode.onaudioprocess = (e) => {
+        // 满足分片的buffer时触发
+        const audioProcess = (e: AudioProcessingEvent) => {
           // 如果处于录音状态，继续传递录到的音频，反之断开AudioContext连接
           if (this.recordStatus) {
             const result = new Float32Array(e.inputBuffer.getChannelData(0)).buffer
             callback(result, context.sampleRate)
           } else {
             // 断开AudioContext连接
+            audioScriptNode.removeEventListener('audioprocess', audioProcess)
             audioSource.disconnect()
             audioScriptNode.disconnect()
           }
         }
+        audioScriptNode.addEventListener('audioprocess', audioProcess)
       }).catch((error) => {
         const newError = genError(Error.NO_RESPONSE, error.message)
         this.onError(newError)
@@ -82,11 +84,11 @@ export default class AudioHandler {
       buffer: buffer,
       sampleRate: sampleRate
     })
-    this.resampleWorker.onmessage = (e: any) => {
-      let buffer = e.data.buffer
-      let result = new Int16Array(buffer).buffer
+    this.resampleWorker.addEventListener('message', (e) => {
+      const buffer = e.data.buffer
+      const result = new Int16Array(buffer).buffer
       callback(result)
-    }
+    })
   }
 
   // 音频压缩阶段
@@ -101,26 +103,29 @@ export default class AudioHandler {
       outData: output,
       outOffset: 0
     })
-    this.speexWorker.onmessage = (e:any) => {
+    this.speexWorker.addEventListener('message', (e) => {
       if (e.data.command === 'encode') {
-        let buffer = e.data.buffer
+        const buffer = e.data.buffer
         const result = new Int8Array(buffer)
         this.onAudioChunk(result.buffer)
       }
-    }
+    })
   }
 
   private handleBuffer (buffer: ArrayBuffer, sampleRate: Number) {
     if (this.isSpeex && !this.isResample) {
-      return this.speex(buffer)
+      this.speex(buffer)
+      return
     }
     if (this.isResample && !this.isSpeex) {
-      return this.resample(buffer, sampleRate, this.onAudioChunk.bind(this))
+      this.resample(buffer, sampleRate, this.onAudioChunk.bind(this))
+      return
     }
     if (this.isSpeex && this.isResample) {
-      return this.resample(buffer, sampleRate, this.speex.bind(this))
+      this.resample(buffer, sampleRate, this.speex.bind(this))
+      return
     }
-    return this.onAudioChunk(buffer)
+    this.onAudioChunk(buffer)
   }
 
   private manage () {
