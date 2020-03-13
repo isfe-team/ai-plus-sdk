@@ -12,7 +12,7 @@ function identity (value?: any) {
   return value
 }
 
-export default class audioCtxt {
+export default class AudioHandler {
   private onAudioChunk: Function
   private onError: Function
   private speexWorker: Worker
@@ -32,7 +32,7 @@ export default class audioCtxt {
     this.isSpeex = audioOption.isSpeex || true
   }
 
-  start() {
+  start () {
     this.recordStatus = true
     this.resampleWorker.postMessage({
       command: 'init',
