@@ -1,2 +1,4 @@
 /node_modules
 /examples/use_tts/node_modules
+/examples/use_iat/node_modules/.bin
+/examples/use_iat/node_modules

@@ -2,14 +2,15 @@ import { Base64 }  from 'js-base64'
 import WsWrapper from '../shared/net/WsWrapper'
 import AudioHandler from './AudioHandler'
 import { IATStatus, SSBParamType, SSBOnlyParamType, IAT_RPCParam, BaseRPCParam, ParamResponse, IATResponse, SSB_Response, AUWParamType, AUW_Response, GRSParamType, GRS_Response, SSEParamType } from './type'
-import { genError, Error } from '../shared/helpers/error';
+import { genError, Error } from '../shared/helpers/error'
+import { identity } from '../shared/helpers/identity'
 
 type iatParam = SSBOnlyParamType & Pick<BaseRPCParam, 'appid'> & Pick<BaseRPCParam, 'uid'> & Pick<BaseRPCParam, 'type'>
 export interface StartOption {
   url: string;
   iatParam: iatParam;
-  isSpeex?: Boolean;
-  isResample?: Boolean;
+  isSpeex?: boolean;
+  isResample?: boolean;
   frameSend?: number;
 }
 
@@ -17,7 +18,7 @@ interface IatPayload {
   sid: string | null;
   svc: string;
   synid: string;
-  audioStatus: string; // 音频状态 2表示未完成
+  audioStatus: string; // 音频状态 2表示未完成,4表示已完成
   audiolen: string;
   audioData: string;
   frameCnt: number;
@@ -33,10 +34,6 @@ function genRPCMessage<T extends IAT_RPCParam> (rpcParam: T): string {
     params: rpcParam
   }
   return JSON.stringify(data)
-}
-
-function identity<T> (value: T) {
-  return value
 }
 
 interface IatOption {
@@ -59,6 +56,7 @@ interface Response {
 // 6. 收到结果应答，当recStatus为5时发送会话结束指令，结束会话
 
 export default class Iat {
+  stop!: Function
   status: IATStatus
   audioHandler: AudioHandler | null
   ws: WsWrapper
@@ -111,9 +109,12 @@ export default class Iat {
         this.onError(errors)
       }
     }
-    this.ws.disconnect()
+    if (this.ws.ws) {
+      this.ws.disconnect()
+    }
     this.ws.connect(wsCallback)
     this.end.bind(this, startOption, iatPayload)
+    this.stop = this._stop.bind(this, startOption, iatPayload)
     if (this.audioHandler) {
       this.audioHandler.stop()
     } else {
@@ -159,7 +160,7 @@ export default class Iat {
           str = str +  String.fromCharCode(outputArray[i])
         }
         iatPayload.audiolen = audioLength.toString()
-        iatPayload.audioData = Base64.btoa(str)
+        iatPayload.audioData = Base64.btoa(str);
         (+iatPayload.synid + 1).toString()
         let audioStatus = iatPayload.audioStatus
         if (iatPayload.audioStatus === '1') {
@@ -295,12 +296,11 @@ export default class Iat {
       this.send(startOption, iatPayload, IATStatus.sessionEnd)
     }
     this.status = IATStatus.idle
-    this.ws.disconnect()
     this.audioHandler = null
   }
   
   // 外部控制，当外部执行手动暂停或结束时走的
-  stop (startOption: StartOption, iatPayload: IatPayload) {
+  _stop (startOption: StartOption, iatPayload: IatPayload) {
     if (this.audioHandler) {
       this.audioHandler.stop()
     }

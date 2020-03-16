@@ -16,7 +16,7 @@ interface WebSocket {
   readyState: Number
 }
 export default class WsWrapper {
-  private ws: WebSocket | null
+  ws: WebSocket | null
   constructor () {
     this.ws = null
   }

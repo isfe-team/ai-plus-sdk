@@ -1,15 +1,12 @@
 import { genError, Error } from '../shared/helpers/error'
-import { resampleWorkerCode, speexWorkerCode } from './WorkerUtils'
+import { resampleWorker, speexWorker } from './WorkerUtils'
+import { identity } from '../shared/helpers/identity'
 
 interface AudioOption {
-  isSpeex: Boolean
-  isResample: Boolean
+  isSpeex: boolean
+  isResample: boolean
   onAudioChunk: Function
   onError?: Function
-}
-
-function identity<T> (value: T) {
-  return value
 }
 
 export default class AudioHandler {
@@ -17,16 +14,16 @@ export default class AudioHandler {
   private onError: Function
   private speexWorker: Worker
   private resampleWorker: Worker
-  private recordStatus: Boolean
-  private isResample: Boolean
-  private isSpeex: Boolean
+  private recordStatus: boolean
+  private isResample: boolean
+  private isSpeex: boolean
   constructor (
     audioOption: AudioOption,
   ) {
     this.onAudioChunk = audioOption.onAudioChunk
     this.onError = audioOption.onError || identity
-    this.speexWorker = speexWorkerCode()
-    this.resampleWorker = resampleWorkerCode()
+    this.speexWorker = speexWorker()
+    this.resampleWorker = resampleWorker()
     this.recordStatus = false
     this.isResample = audioOption.isResample
     this.isSpeex = audioOption.isSpeex
